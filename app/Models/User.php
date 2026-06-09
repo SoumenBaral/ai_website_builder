@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'plan', 'role'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -29,4 +29,7 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function projects() { return $this->hasMany(Project::class); }
+    public function aiGenerations() { return $this->hasMany(AiGeneration::class); }
 }
