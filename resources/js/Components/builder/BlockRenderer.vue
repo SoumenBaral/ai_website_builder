@@ -40,6 +40,23 @@ const props = defineProps({
 
 const emit = defineEmits(['update:props', 'select']);
 const component = computed(() => blockMap[props.block.type]);
+
+const sectionStyle = computed(() => {
+    const bg = props.block.props?.sectionBg;
+    const text = props.block.props?.sectionText;
+    if (!bg && !text) return {};
+    const style = {};
+    if (bg) {
+        style['--bg'] = bg;
+        if (props.block.type === 'cta') style['--primary'] = bg;
+        if (props.block.type === 'footer') style['--secondary'] = bg;
+    }
+    if (text) {
+        style['--text'] = text;
+        style['color'] = text;
+    }
+    return style;
+});
 </script>
 
 <template>
@@ -47,6 +64,7 @@ const component = computed(() => blockMap[props.block.type]);
         @click.stop="emit('select', block.id)"
         class="relative group transition-all"
         :class="{ 'ring-2 ring-blue-500 ring-offset-2': selected }"
+        :style="sectionStyle"
     >
         <component
             v-if="component"

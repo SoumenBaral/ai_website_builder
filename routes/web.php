@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AssetController;
 use App\Http\Controllers\EditorController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\PageController;
@@ -54,6 +55,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Versions
     Route::get('/projects/{project}/versions', [VersionController::class, 'index'])->name('versions.index');
     Route::post('/versions/{version}/restore', [VersionController::class, 'restore'])->name('versions.restore');
+
+    // Assets (image upload)
+    Route::get('/projects/{project}/assets', [AssetController::class, 'index'])->name('assets.index');
+    Route::post('/projects/{project}/assets', [AssetController::class, 'store'])->name('assets.store');
+    Route::delete('/projects/{project}/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
 
     // Analytics
     Route::get('/projects/{project}/analytics', [AnalyticsController::class, 'dashboard'])->name('analytics.dashboard');

@@ -8,7 +8,7 @@
 
         @php $columns = $props['columns'] ?? 3; @endphp
 
-        <div class="grid gap-4" style="grid-template-columns: repeat({{ $columns }}, minmax(0, 1fr));">
+        <div class="grid gap-4 grid-cols-1 {{ $columns >= 2 ? 'sm:grid-cols-2' : '' }} {{ $columns >= 3 ? 'lg:grid-cols-3' : '' }} {{ $columns >= 4 ? 'lg:grid-cols-4' : '' }}">
             @if(!empty($props['images']))
                 @foreach($props['images'] as $image)
                     <div class="overflow-hidden" style="border-radius: var(--radius);">

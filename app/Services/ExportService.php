@@ -14,10 +14,30 @@ class ExportService
                 if (!view()->exists($viewName)) {
                     return "<!-- Unknown block type: {$block['type']} -->";
                 }
-                return view($viewName, [
+                $html = view($viewName, [
                     'props' => $block['props'],
                     'theme' => $schema['theme'],
                 ])->render();
+
+                $hasBg = !empty($block['props']['sectionBg']);
+                $hasText = !empty($block['props']['sectionText']);
+                if ($hasBg || $hasText) {
+                    $vars = '';
+                    if ($hasBg) {
+                        $bg = e($block['props']['sectionBg']);
+                        $vars .= '--bg: ' . $bg;
+                        if ($block['type'] === 'cta') $vars .= '; --primary: ' . $bg;
+                        if ($block['type'] === 'footer') $vars .= '; --secondary: ' . $bg;
+                    }
+                    if ($hasText) {
+                        $txt = e($block['props']['sectionText']);
+                        if ($vars) $vars .= '; ';
+                        $vars .= '--text: ' . $txt . '; color: ' . $txt;
+                    }
+                    $html = '<div style="' . $vars . ';">' . $html . '</div>';
+                }
+
+                return $html;
             })
             ->implode("\n");
 

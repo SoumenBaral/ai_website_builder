@@ -36,7 +36,7 @@ function onEditFeature(e, planIndex, featureIndex) {
                 @blur="onEdit($event, 'heading')"
             >{{ heading }}</h2>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
                 <div
                     v-for="(plan, i) in plans"
                     :key="i"

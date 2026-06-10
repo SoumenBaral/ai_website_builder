@@ -6,7 +6,7 @@
             </h2>
         @endif
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             @if(!empty($props['items']))
                 @foreach($props['items'] as $item)
                     <div class="p-6 shadow-md" style="border-radius: var(--radius); background-color: var(--bg); border: 1px solid rgba(0,0,0,0.1);">

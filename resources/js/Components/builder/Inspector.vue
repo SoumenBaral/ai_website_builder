@@ -1,8 +1,11 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, inject } from 'vue';
 import { useEditor } from '@/stores/editor.js';
 import { BLOCK_TYPES } from '@/schema/defaults.js';
+import ImagePicker from '@/Components/builder/ImagePicker.vue';
 import axios from 'axios';
+
+const projectId = inject('projectId');
 
 const editor = useEditor();
 const aiInstruction = ref('');
@@ -35,6 +38,11 @@ function removeArrayItem(key, index) {
     const arr = [...(block.value.props[key] || [])];
     arr.splice(index, 1);
     editor.updateProps(block.value.id, { [key]: arr });
+}
+
+function isImageProp(key) {
+    const k = key.toLowerCase();
+    return k === 'image' || k === 'src' || k === 'avatar' || k === 'photo' || k === 'logo' || k === 'backgroundimage';
 }
 
 async function askAi() {
@@ -72,14 +80,79 @@ async function askAi() {
                 >Delete</button>
             </div>
 
+            <!-- Section Colors -->
+            <div class="mb-4 pb-4 border-b border-gray-100 space-y-3">
+                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Section Colors</label>
+
+                <!-- Background -->
+                <div class="space-y-1">
+                    <label class="text-[10px] font-medium text-gray-400">Background</label>
+                    <div class="flex items-center gap-2">
+                        <input
+                            type="color"
+                            :value="block.props.sectionBg || '#ffffff'"
+                            @input="update('sectionBg', $event.target.value)"
+                            class="w-10 h-8 rounded cursor-pointer border border-gray-200"
+                        />
+                        <input
+                            type="text"
+                            :value="block.props.sectionBg || ''"
+                            @input="update('sectionBg', $event.target.value)"
+                            placeholder="Theme default"
+                            class="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500"
+                        />
+                        <button
+                            v-if="block.props.sectionBg"
+                            @click="update('sectionBg', '')"
+                            class="text-xs text-gray-400 hover:text-red-500"
+                            title="Reset"
+                        >&#x2715;</button>
+                    </div>
+                </div>
+
+                <!-- Text Color -->
+                <div class="space-y-1">
+                    <label class="text-[10px] font-medium text-gray-400">Text Color</label>
+                    <div class="flex items-center gap-2">
+                        <input
+                            type="color"
+                            :value="block.props.sectionText || '#1a1a1a'"
+                            @input="update('sectionText', $event.target.value)"
+                            class="w-10 h-8 rounded cursor-pointer border border-gray-200"
+                        />
+                        <input
+                            type="text"
+                            :value="block.props.sectionText || ''"
+                            @input="update('sectionText', $event.target.value)"
+                            placeholder="Theme default"
+                            class="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500"
+                        />
+                        <button
+                            v-if="block.props.sectionText"
+                            @click="update('sectionText', '')"
+                            class="text-xs text-gray-400 hover:text-red-500"
+                            title="Reset"
+                        >&#x2715;</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="space-y-4">
                 <!-- String props -->
                 <template v-for="(value, key) in block.props" :key="key">
-                    <!-- Skip arrays and objects (handled separately) -->
-                    <div v-if="typeof value === 'string'" class="space-y-1">
+                    <!-- Skip sectionBg (shown above), arrays and objects (handled separately) -->
+                    <div v-if="key === 'sectionBg' || key === 'sectionText'" class="hidden"></div>
+                    <div v-else-if="typeof value === 'string'" class="space-y-1">
                         <label class="text-xs font-medium text-gray-500 capitalize">{{ key }}</label>
+                        <!-- Image props -->
+                        <ImagePicker
+                            v-if="isImageProp(key)"
+                            :model-value="value"
+                            :project-id="projectId"
+                            @update:model-value="update(key, $event)"
+                        />
                         <textarea
-                            v-if="key === 'body' || key === 'description'"
+                            v-else-if="key === 'body' || key === 'description'"
                             :value="value"
                             @input="update(key, $event.target.value)"
                             rows="3"
@@ -127,7 +200,15 @@ async function askAi() {
                                 class="absolute top-1 right-1 text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100"
                             >✕</button>
                             <div v-for="(val, field) in item" :key="field">
+                                <label class="text-[10px] text-gray-400 capitalize">{{ field }}</label>
+                                <ImagePicker
+                                    v-if="isImageProp(field)"
+                                    :model-value="val"
+                                    :project-id="projectId"
+                                    @update:model-value="updateNested(key, i, field, $event)"
+                                />
                                 <input
+                                    v-else
                                     type="text"
                                     :value="val"
                                     @input="updateNested(key, i, field, $event.target.value)"

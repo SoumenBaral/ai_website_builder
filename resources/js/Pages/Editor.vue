@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, provide, onMounted, onUnmounted } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import { useEditor } from '@/stores/editor.js';
 import { themeToVars } from '@/composables/useTheme.js';
@@ -34,6 +34,7 @@ function unpublishSite() {
 }
 
 const editor = useEditor();
+provide('projectId', props.project.id);
 const previewWidth = ref('100%');
 const activeRightPanel = ref('inspector'); // 'inspector' | 'theme'
 const showVersionHistory = ref(false);
@@ -226,7 +227,11 @@ const fontLink = computed(() => {
             <div class="flex-1 overflow-y-auto p-6 bg-gray-100">
                 <div
                     v-if="editor.schema?.sections?.length"
-                    class="mx-auto shadow-xl transition-all duration-300 bg-white"
+                    class="mx-auto shadow-xl transition-all duration-300 bg-white preview-canvas"
+                    :class="{
+                        'preview-mobile': previewWidth === '390px',
+                        'preview-tablet': previewWidth === '768px',
+                    }"
                     :style="{ maxWidth: previewWidth, ...themeVars }"
                     style="font-family: var(--font-body);"
                 >
@@ -279,3 +284,50 @@ const fontLink = computed(() => {
         </Transition>
     </div>
 </template>
+
+<style>
+/*
+  Force responsive layouts inside the editor preview canvas.
+  Tailwind's md:/lg: breakpoints read the viewport, not the container,
+  so when we shrink the canvas to 390px or 768px we override the
+  multi-column grids back to single-column.
+*/
+.preview-mobile .grid.md\:grid-cols-2,
+.preview-mobile .grid.md\:grid-cols-3,
+.preview-mobile .grid.md\:grid-cols-4,
+.preview-mobile .grid.lg\:grid-cols-3,
+.preview-mobile .grid.lg\:grid-cols-4,
+.preview-mobile .grid.sm\:grid-cols-2 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+.preview-mobile .md\:grid-cols-2,
+.preview-mobile .md\:text-5xl,
+.preview-mobile .md\:text-4xl {
+    /* Reset large text sizes for mobile */
+}
+.preview-mobile h1.text-4xl.md\:text-6xl,
+.preview-mobile h1.text-4xl.md\:text-5xl {
+    font-size: 1.875rem !important;
+    line-height: 2.25rem !important;
+}
+.preview-mobile .md\:text-xl {
+    font-size: 1rem !important;
+}
+.preview-mobile .flex-row {
+    flex-direction: column !important;
+}
+.preview-mobile nav .hidden.md\:flex {
+    display: none !important;
+}
+
+/* Tablet: 2 cols max instead of 3+ */
+.preview-tablet .grid.md\:grid-cols-3,
+.preview-tablet .grid.lg\:grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+.preview-tablet .grid.md\:grid-cols-4,
+.preview-tablet .grid.lg\:grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+</style>
