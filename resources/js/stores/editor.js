@@ -72,6 +72,15 @@ export const useEditor = defineStore('editor', {
             this.selectedId = block.id;
         },
 
+        updateSection(id, newSection) {
+            this.pushHistory();
+            const idx = this.schema.sections.findIndex(s => s.id === id);
+            if (idx !== -1) {
+                this.schema.sections[idx] = newSection;
+                this.dirty = true;
+            }
+        },
+
         removeBlock(id) {
             this.pushHistory();
             this.schema.sections = this.schema.sections.filter(s => s.id !== id);

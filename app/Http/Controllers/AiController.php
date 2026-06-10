@@ -68,4 +68,26 @@ class AiController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    public function editSection(Request $request, AiWebsiteService $ai)
+    {
+        $request->validate([
+            'section' => 'required|array',
+            'theme' => 'required|array',
+            'instruction' => 'required|string|max:1000',
+        ]);
+
+        try {
+            $section = $ai->editSection(
+                $request->section,
+                $request->instruction,
+                $request->theme,
+                $request->user()->id,
+            );
+
+            return response()->json(['section' => $section]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }
