@@ -3,6 +3,7 @@ import { computed, ref, inject } from 'vue';
 import { useEditor } from '@/stores/editor.js';
 import { BLOCK_TYPES } from '@/schema/defaults.js';
 import ImagePicker from '@/Components/builder/ImagePicker.vue';
+import CustomElementEditor from '@/Components/builder/CustomElementEditor.vue';
 import axios from 'axios';
 
 const projectId = inject('projectId');
@@ -39,6 +40,48 @@ function removeArrayItem(key, index) {
     const arr = [...(block.value.props[key] || [])];
     arr.splice(index, 1);
     editor.updateProps(block.value.id, { [key]: arr });
+}
+
+// Custom block element management
+const showAddElement = ref(false);
+const elementTemplates = {
+    heading: { type: 'heading', text: 'New Heading', size: '2xl', align: 'left' },
+    text: { type: 'text', text: 'Add your text here...', size: 'base', align: 'left' },
+    image: { type: 'image', src: '', alt: '', radius: '', shadow: '', border: '', width: 'full' },
+    icon: { type: 'icon', emoji: '⭐', size: '4xl' },
+    button: { type: 'button', text: 'Click Me', href: '#', variant: 'primary' },
+    divider: { type: 'divider', style: 'solid' },
+    spacer: { type: 'spacer', height: 'md' },
+};
+const elementTypeList = [
+    { type: 'heading', icon: '𝐇', label: 'Heading' },
+    { type: 'text', icon: '𝐓', label: 'Text' },
+    { type: 'image', icon: '🖼', label: 'Image' },
+    { type: 'icon', icon: '⭐', label: 'Icon' },
+    { type: 'button', icon: '🔘', label: 'Button' },
+    { type: 'divider', icon: '―', label: 'Divider' },
+    { type: 'spacer', icon: '↕', label: 'Spacer' },
+];
+
+function addElement(type) {
+    if (!block.value) return;
+    const els = [...(block.value.props.elements || []), { ...elementTemplates[type] }];
+    editor.updateProps(block.value.id, { elements: els });
+    showAddElement.value = false;
+}
+
+function updateElement(index, newEl) {
+    if (!block.value) return;
+    const els = [...(block.value.props.elements || [])];
+    els[index] = newEl;
+    editor.updateProps(block.value.id, { elements: els });
+}
+
+function removeElement(index) {
+    if (!block.value) return;
+    const els = [...(block.value.props.elements || [])];
+    els.splice(index, 1);
+    editor.updateProps(block.value.id, { elements: els });
 }
 
 function isImageProp(key) {
@@ -259,7 +302,72 @@ const quickActions = computed(() => {
                 </div>
             </div>
 
-            <div class="space-y-4">
+            <!-- ===== CUSTOM BLOCK ELEMENT EDITOR ===== -->
+            <div v-if="block.type === 'custom'" class="space-y-3 mb-4 pb-4 border-b border-gray-100">
+                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Layout</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-medium text-gray-400">Columns</label>
+                        <select :value="block.props.columns || 1" @change="update('columns', Number($event.target.value))" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
+                            <option :value="1">1</option>
+                            <option :value="2">2</option>
+                            <option :value="3">3</option>
+                            <option :value="4">4</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-medium text-gray-400">Gap</label>
+                        <select :value="block.props.gap || 'md'" @change="update('gap', $event.target.value)" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
+                            <option value="sm">Small</option>
+                            <option value="md">Medium</option>
+                            <option value="lg">Large</option>
+                            <option value="xl">XL</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-medium text-gray-400">Padding</label>
+                        <select :value="block.props.padding || 'lg'" @change="update('padding', $event.target.value)" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
+                            <option value="sm">Small</option>
+                            <option value="md">Medium</option>
+                            <option value="lg">Large</option>
+                            <option value="xl">XL</option>
+                        </select>
+                    </div>
+                </div>
+
+                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-4 block">Elements</label>
+                <div class="space-y-2">
+                    <CustomElementEditor
+                        v-for="(el, i) in (block.props.elements || [])"
+                        :key="i"
+                        :element="el"
+                        :index="i"
+                        @update="updateElement"
+                        @remove="removeElement"
+                    />
+                </div>
+
+                <!-- Add element -->
+                <div class="relative">
+                    <button
+                        @click="showAddElement = !showAddElement"
+                        class="w-full px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+                    >+ Add Element</button>
+                    <div v-if="showAddElement" class="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-xl shadow-xl z-30 overflow-hidden">
+                        <button
+                            v-for="et in elementTypeList"
+                            :key="et.type"
+                            @click="addElement(et.type)"
+                            class="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 transition-colors text-left"
+                        >
+                            <span class="w-5 text-center">{{ et.icon }}</span>
+                            <span class="font-medium text-gray-700">{{ et.label }}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="block.type !== 'custom'" class="space-y-4">
                 <!-- String props -->
                 <template v-for="(value, key) in block.props" :key="key">
                     <!-- Skip styled props (shown above), arrays and objects (handled separately) -->

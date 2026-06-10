@@ -154,6 +154,9 @@ faq: { heading, image (optional side image, creates 2-col layout), items [{quest
 team: { heading, members [{name, role, image, bio}], columns (1-4, default 4) }
 cta: { heading, subheading, ctaText, ctaHref, image (optional background image with overlay), align ("center"|"left") }
 contact: { heading, subheading, image (optional top image), email, phone, address, fields (string[]), layout ("split"|"stacked", default "split") }
+custom: { columns (1-4), gap (sm/md/lg/xl), padding (sm/md/lg/xl), elements (array of element objects) }
+  Element types: heading {text, size (xl/2xl/3xl/4xl), align}, text {text, size (sm/base/lg/xl), align}, image {src ("PLACEHOLDER:desc"), alt, radius, shadow, border, width (full/half/third)}, icon {emoji, size (2xl-5xl)}, button {text, href, variant (primary/secondary/outline)}, divider {style (solid/dashed/dotted)}, spacer {height (sm/md/lg/xl)}
+  Use custom blocks when users want a unique layout that doesn't fit predefined block types.
 footer: { brand, links [{label, href}], copyright, socials [{platform, url}] }
 
 NOTE: ALL blocks now support an optional `image` prop. Use it to add visual richness.
@@ -319,7 +322,7 @@ PROMPT;
                             'id' => ['type' => 'string'],
                             'type' => [
                                 'type' => 'string',
-                                'enum' => ['navbar', 'hero', 'features', 'gallery', 'about', 'services', 'testimonials', 'pricing', 'stats', 'faq', 'team', 'cta', 'contact', 'footer'],
+                                'enum' => ['navbar', 'hero', 'features', 'gallery', 'about', 'services', 'testimonials', 'pricing', 'stats', 'faq', 'team', 'cta', 'contact', 'custom', 'footer'],
                             ],
                             'props' => ['type' => 'object'],
                         ],

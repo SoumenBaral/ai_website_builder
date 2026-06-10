@@ -174,6 +174,20 @@ export const BLOCK_TYPES = {
             align: 'center',
         },
     },
+    custom: {
+        label: 'Custom',
+        icon: '🧩',
+        defaultProps: {
+            columns: 1,
+            gap: 'md',
+            padding: 'lg',
+            align: 'center',
+            elements: [
+                { type: 'heading', text: 'Custom Section', size: '3xl', align: 'center' },
+                { type: 'text', text: 'Add your own elements to build any layout you want.', size: 'base', align: 'center' },
+            ],
+        },
+    },
     footer: {
         label: 'Footer',
         icon: '🔻',

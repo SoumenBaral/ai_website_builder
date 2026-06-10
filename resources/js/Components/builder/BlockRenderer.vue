@@ -14,6 +14,7 @@ import BlockPricing from './blocks/BlockPricing.vue';
 import BlockStats from './blocks/BlockStats.vue';
 import BlockFaq from './blocks/BlockFaq.vue';
 import BlockTeam from './blocks/BlockTeam.vue';
+import BlockCustom from './blocks/BlockCustom.vue';
 
 const blockMap = {
     navbar: BlockNavbar,
@@ -30,6 +31,7 @@ const blockMap = {
     stats: BlockStats,
     faq: BlockFaq,
     team: BlockTeam,
+    custom: BlockCustom,
 };
 
 const props = defineProps({
