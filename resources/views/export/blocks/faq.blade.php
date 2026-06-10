@@ -1,5 +1,6 @@
 <section class="py-16 px-6" style="background-color: var(--bg); color: var(--text); font-family: var(--font-body);">
-    <div class="max-w-3xl mx-auto">
+    @php $wClass = ['sm' => 'max-w-xl', 'md' => 'max-w-3xl', 'lg' => 'max-w-5xl', 'full' => 'max-w-6xl'][$props['maxWidth'] ?? 'md'] ?? 'max-w-3xl'; @endphp
+    <div class="{{ $wClass }} mx-auto">
         @if(!empty($props['heading']))
             <h2 class="text-3xl font-bold text-center mb-12" style="font-family: var(--font-heading);">
                 {{ $props['heading'] }}

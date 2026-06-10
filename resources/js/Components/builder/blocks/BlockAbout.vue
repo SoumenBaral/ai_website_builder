@@ -3,6 +3,7 @@ const props = defineProps({
     heading: String,
     body: String,
     image: String,
+    imagePosition: { type: String, default: 'right' },
     editable: { type: Boolean, default: false },
     id: String,
 });
@@ -16,7 +17,7 @@ function onEdit(e, key) {
 <template>
     <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
         <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div>
+            <div :class="imagePosition === 'left' ? 'md:order-2' : ''">
                 <h2
                     class="text-3xl md:text-4xl font-bold mb-6"
                     :style="{ fontFamily: 'var(--font-heading)' }"
@@ -30,7 +31,7 @@ function onEdit(e, key) {
                     @blur="onEdit($event, 'body')"
                 >{{ body }}</p>
             </div>
-            <div v-if="image">
+            <div v-if="image" :class="imagePosition === 'left' ? 'md:order-1' : ''">
                 <img
                     :src="image"
                     :alt="heading"

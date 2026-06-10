@@ -6,7 +6,11 @@
             </h2>
         @endif
 
-        <div class="flex flex-wrap justify-center gap-12">
+        @php
+            $cols = $props['columns'] ?? 4;
+            $gridClass = [2 => 'grid-cols-2', 3 => 'grid-cols-2 md:grid-cols-3', 4 => 'grid-cols-2 md:grid-cols-4', 5 => 'grid-cols-2 md:grid-cols-5', 6 => 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6'][$cols] ?? 'grid-cols-2 md:grid-cols-4';
+        @endphp
+        <div class="grid {{ $gridClass }} gap-8">
             @if(!empty($props['items']))
                 @foreach($props['items'] as $item)
                     <div class="text-center">

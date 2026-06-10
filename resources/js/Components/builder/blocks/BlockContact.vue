@@ -3,7 +3,9 @@ const props = defineProps({
     heading: String,
     email: String,
     phone: String,
+    address: String,
     fields: Array,
+    layout: { type: String, default: 'split' },
     editable: { type: Boolean, default: false },
     id: String,
 });
@@ -32,8 +34,8 @@ const fieldLabels = {
                 @blur="onEdit($event, 'heading')"
             >{{ heading }}</h2>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
-                <div>
+            <div :class="layout === 'stacked' ? 'space-y-8' : 'grid grid-cols-1 md:grid-cols-2 gap-12'">
+                <div :class="layout === 'stacked' ? 'flex flex-wrap gap-6 justify-center' : ''">
                     <div v-if="email" class="flex items-center gap-3 mb-4">
                         <span class="text-2xl">📧</span>
                         <span
@@ -49,6 +51,14 @@ const fieldLabels = {
                             :contenteditable="editable"
                             @blur="onEdit($event, 'phone')"
                         >{{ phone }}</span>
+                    </div>
+                    <div v-if="address" class="flex items-center gap-3 mb-4">
+                        <span class="text-2xl">📍</span>
+                        <span
+                            :style="{ fontFamily: 'var(--font-body)' }"
+                            :contenteditable="editable"
+                            @blur="onEdit($event, 'address')"
+                        >{{ address }}</span>
                     </div>
                 </div>
 

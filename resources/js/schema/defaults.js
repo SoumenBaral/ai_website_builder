@@ -23,6 +23,9 @@ export const BLOCK_TYPES = {
             ctaHref: '#',
             image: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1200&q=80',
             align: 'center',
+            layout: 'center',
+            overlayOpacity: 50,
+            minHeight: 'lg',
         },
     },
     features: {
@@ -30,6 +33,8 @@ export const BLOCK_TYPES = {
         icon: '✨',
         defaultProps: {
             heading: 'Our Features',
+            columns: 3,
+            align: 'center',
             items: [
                 { icon: '🚀', title: 'Fast', description: 'Blazing fast performance.' },
                 { icon: '🔒', title: 'Secure', description: 'Enterprise-grade security.' },
@@ -57,6 +62,7 @@ export const BLOCK_TYPES = {
             heading: 'About Us',
             body: 'We are a passionate team dedicated to creating amazing digital experiences.',
             image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80',
+            imagePosition: 'right',
         },
     },
     contact: {
@@ -67,6 +73,7 @@ export const BLOCK_TYPES = {
             email: 'hello@example.com',
             phone: '+1 234 567 890',
             fields: ['name', 'email', 'message'],
+            layout: 'split',
         },
     },
     services: {
@@ -74,6 +81,8 @@ export const BLOCK_TYPES = {
         icon: '🛠️',
         defaultProps: {
             heading: 'Our Services',
+            columns: 3,
+            align: 'center',
             items: [
                 { icon: '💻', title: 'Web Development', description: 'Custom websites built for your needs.' },
                 { icon: '📱', title: 'Mobile Apps', description: 'iOS and Android applications.' },
@@ -86,6 +95,7 @@ export const BLOCK_TYPES = {
         icon: '💬',
         defaultProps: {
             heading: 'What Our Clients Say',
+            columns: 3,
             items: [
                 { quote: 'Amazing work! Exceeded all expectations.', author: 'Sarah Johnson', role: 'CEO, TechCo' },
                 { quote: 'Professional, fast, and reliable.', author: 'Mike Chen', role: 'Founder, StartupXYZ' },
@@ -98,6 +108,7 @@ export const BLOCK_TYPES = {
         icon: '💰',
         defaultProps: {
             heading: 'Simple Pricing',
+            columns: 3,
             plans: [
                 { name: 'Starter', price: '$9', period: '/month', features: ['1 Project', '5GB Storage', 'Email Support'], ctaText: 'Get Started', highlighted: false },
                 { name: 'Pro', price: '$29', period: '/month', features: ['10 Projects', '50GB Storage', 'Priority Support', 'Analytics'], ctaText: 'Go Pro', highlighted: true },
@@ -110,6 +121,7 @@ export const BLOCK_TYPES = {
         icon: '📊',
         defaultProps: {
             heading: 'By the Numbers',
+            columns: 4,
             items: [
                 { value: '500+', label: 'Projects Completed' },
                 { value: '98%', label: 'Client Satisfaction' },
@@ -123,6 +135,7 @@ export const BLOCK_TYPES = {
         icon: '❓',
         defaultProps: {
             heading: 'Frequently Asked Questions',
+            maxWidth: 'md',
             items: [
                 { question: 'How do I get started?', answer: 'Simply sign up for a free account and follow our getting started guide.' },
                 { question: 'Can I cancel anytime?', answer: 'Yes, you can cancel your subscription at any time with no hidden fees.' },
@@ -135,6 +148,7 @@ export const BLOCK_TYPES = {
         icon: '👥',
         defaultProps: {
             heading: 'Meet Our Team',
+            columns: 4,
             members: [
                 { name: 'Alex Smith', role: 'CEO & Founder', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&q=80' },
                 { name: 'Jamie Lee', role: 'Lead Designer', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&q=80' },
@@ -150,6 +164,7 @@ export const BLOCK_TYPES = {
             subheading: 'Join thousands of happy customers today.',
             ctaText: 'Start Now',
             ctaHref: '#',
+            align: 'center',
         },
     },
     footer: {

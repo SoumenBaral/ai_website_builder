@@ -1,28 +1,24 @@
+@php
+    $cols = $props['columns'] ?? 3;
+    $align = $props['align'] ?? 'center';
+    $gridClass = [1 => 'grid-cols-1', 2 => 'grid-cols-1 sm:grid-cols-2', 3 => 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3', 4 => 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'][$cols] ?? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+@endphp
 <section class="py-16 px-6" style="background-color: var(--bg); color: var(--text); font-family: var(--font-body);">
     <div class="max-w-6xl mx-auto">
         @if(!empty($props['heading']))
-            <h2 class="text-3xl font-bold text-center mb-12" style="font-family: var(--font-heading);">
+            <h2 class="text-3xl font-bold {{ $align === 'left' ? 'text-left' : 'text-center' }} mb-12" style="font-family: var(--font-heading);">
                 {{ $props['heading'] }}
             </h2>
         @endif
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div class="grid {{ $gridClass }} gap-8">
             @if(!empty($props['items']))
                 @foreach($props['items'] as $item)
-                    <div class="p-6 text-center" style="border-radius: var(--radius); background-color: var(--bg);">
+                    <div class="p-6 {{ $align === 'left' ? 'text-left' : 'text-center' }}" style="border-radius: var(--radius); background-color: var(--bg);">
                         @if(!empty($item['icon']))
-                            <div class="text-4xl mb-4" style="color: var(--primary);">
-                                {!! $item['icon'] !!}
-                            </div>
+                            <div class="text-4xl mb-4" style="color: var(--primary);">{!! $item['icon'] !!}</div>
                         @endif
-
-                        <h3 class="text-xl font-semibold mb-2" style="font-family: var(--font-heading);">
-                            {{ $item['title'] ?? '' }}
-                        </h3>
-
-                        <p class="opacity-80">
-                            {{ $item['description'] ?? '' }}
-                        </p>
+                        <h3 class="text-xl font-semibold mb-2" style="font-family: var(--font-heading);">{{ $item['title'] ?? '' }}</h3>
+                        <p class="opacity-80">{{ $item['description'] ?? '' }}</p>
                     </div>
                 @endforeach
             @endif

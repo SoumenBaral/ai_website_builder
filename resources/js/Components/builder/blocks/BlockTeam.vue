@@ -1,10 +1,20 @@
 <script setup>
+import { computed } from 'vue';
+
 const props = defineProps({
     heading: String,
     members: Array,
+    columns: { type: Number, default: 4 },
     editable: { type: Boolean, default: false },
     id: String,
 });
+
+const gridClass = computed(() => ({
+    1: 'grid-cols-1',
+    2: 'grid-cols-1 sm:grid-cols-2',
+    3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+    4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+}[props.columns] || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'));
 const emit = defineEmits(['update:props']);
 
 function onEdit(e, key) {
@@ -28,7 +38,7 @@ function onEditMember(e, index, key) {
                 @blur="onEdit($event, 'heading')"
             >{{ heading }}</h2>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div class="grid gap-8" :class="gridClass">
                 <div
                     v-for="(member, i) in members"
                     :key="i"

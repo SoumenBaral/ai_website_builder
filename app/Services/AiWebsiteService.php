@@ -136,31 +136,41 @@ class AiWebsiteService
     private function blockPropsReference(): string
     {
         return <<<'REF'
-BLOCK TYPES & THEIR PROPS:
+BLOCK TYPES & THEIR PROPS (including layout props):
 
-navbar: { brand (string), links (array of {label, href}), ctaText (string), ctaHref (string) }
-hero: { heading, subheading, ctaText, ctaHref, image (URL or "PLACEHOLDER:desc"), align ("center"|"left") }
-features: { heading, items (array of {icon (emoji), title, description}) }
-gallery: { heading, columns (number 2-4), images (array of {src, caption}) }
-about: { heading, body (long text), image }
-services: { heading, items (array of {icon (emoji), title, description}) }
-testimonials: { heading, items (array of {quote, author, role, image}) }
-pricing: { heading, plans (array of {name, price, period, features (string[]), cta, highlighted (bool)}) }
-stats: { heading, items (array of {value, label}) }
-faq: { heading, items (array of {question, answer}) }
-team: { heading, members (array of {name, role, image, bio}) }
-cta: { heading, subheading, ctaText, ctaHref }
-contact: { heading, subheading, email, phone, address, fields (string[] like ["name","email","message"]) }
-footer: { brand, links (array of {label, href}), copyright, socials (array of {platform, url}) }
+navbar: { brand, links [{label, href}], ctaText, ctaHref }
+hero: { heading, subheading, ctaText, ctaHref, image, align ("center"|"left"|"right"), layout ("center"|"left"|"right"|"split-left"|"split-right"), overlayOpacity (0-100, default 50), minHeight ("sm"|"md"|"lg"|"full") }
+  - layout "center"/"left"/"right": full background image with text alignment
+  - layout "split-left": image on LEFT, text on RIGHT (50/50 grid)
+  - layout "split-right": text on LEFT, image on RIGHT (50/50 grid)
+features: { heading, items [{icon (emoji), title, description}], columns (1-4, default 3), align ("center"|"left") }
+gallery: { heading, columns (2-4), images [{src, caption}] }
+about: { heading, body, image, imagePosition ("left"|"right", default "right") }
+services: { heading, items [{icon (emoji), title, description}], columns (1-4, default 3), align ("center"|"left") }
+testimonials: { heading, items [{quote, author, role, image}], columns (1-3, default 3) }
+pricing: { heading, plans [{name, price, period, features (string[]), cta, highlighted (bool)}], columns (1-3, default 3) }
+stats: { heading, items [{value, label}], columns (2-6, default 4) }
+faq: { heading, items [{question, answer}], maxWidth ("sm"|"md"|"lg"|"full", default "md") }
+team: { heading, members [{name, role, image, bio}], columns (1-4, default 4) }
+cta: { heading, subheading, ctaText, ctaHref, align ("center"|"left") }
+contact: { heading, subheading, email, phone, address, fields (string[]), layout ("split"|"stacked", default "split") }
+footer: { brand, links [{label, href}], copyright, socials [{platform, url}] }
 
 STYLING PROPS (available on ALL section types):
-- sectionBg: custom background color for this section (hex like "#1e293b" or any CSS color)
-- sectionText: custom text color for this section (hex like "#ffffff")
-These override the global theme for that section only. Great for contrast sections (e.g. dark hero on light site).
+- sectionBg: custom background color (hex like "#1e293b" or any CSS color)
+- sectionText: custom text color (hex like "#ffffff")
+These override the global theme for that section only. Use them to create contrast (dark hero, colored CTA, alternating sections).
+
+LAYOUT TIPS:
+- Use "split-left"/"split-right" for hero to create modern side-by-side layouts
+- Set imagePosition "left" on about sections for variety
+- Use columns to control grid density (fewer columns = bigger cards)
+- Set align "left" for a more editorial/blog feel, "center" for landing pages
+- Use minHeight "full" for full-screen hero sections
+- Use layout "stacked" on contact for a centered single-column form
 
 IMAGES:
-- For any image prop, use "PLACEHOLDER:<short description>" and the server replaces it with a real photo.
-- Example: "PLACEHOLDER:modern office workspace" → real Unsplash URL.
+- Use "PLACEHOLDER:<short description>" for new images — server replaces with real Unsplash photos.
 REF;
     }
 

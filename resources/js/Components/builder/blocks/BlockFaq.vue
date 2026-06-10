@@ -4,9 +4,17 @@ import { ref } from 'vue';
 const props = defineProps({
     heading: String,
     items: Array,
+    maxWidth: { type: String, default: 'md' },
     editable: { type: Boolean, default: false },
     id: String,
 });
+
+const widthClass = {
+    sm: 'max-w-xl',
+    md: 'max-w-3xl',
+    lg: 'max-w-5xl',
+    full: 'max-w-6xl',
+};
 const emit = defineEmits(['update:props']);
 
 const openIndex = ref(null);
@@ -28,7 +36,7 @@ function onEditItem(e, index, key) {
 
 <template>
     <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
-        <div class="max-w-3xl mx-auto">
+        <div :class="[widthClass[maxWidth] || 'max-w-3xl', 'mx-auto']">
             <h2
                 class="text-3xl md:text-4xl font-bold text-center mb-12"
                 :style="{ fontFamily: 'var(--font-heading)' }"

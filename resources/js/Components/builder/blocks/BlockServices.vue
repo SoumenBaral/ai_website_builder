@@ -1,10 +1,21 @@
 <script setup>
+import { computed } from 'vue';
+
 const props = defineProps({
     heading: String,
     items: Array,
+    columns: { type: Number, default: 3 },
+    align: { type: String, default: 'center' },
     editable: { type: Boolean, default: false },
     id: String,
 });
+
+const gridClass = computed(() => ({
+    1: 'grid-cols-1',
+    2: 'grid-cols-1 sm:grid-cols-2',
+    3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+    4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+}[props.columns] || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'));
 const emit = defineEmits(['update:props']);
 
 function onEdit(e, key) {
@@ -22,13 +33,14 @@ function onEditItem(e, index, key) {
     <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
         <div class="max-w-6xl mx-auto">
             <h2
-                class="text-3xl md:text-4xl font-bold text-center mb-12"
+                class="text-3xl md:text-4xl font-bold mb-12"
+                :class="align === 'left' ? 'text-left' : 'text-center'"
                 :style="{ fontFamily: 'var(--font-heading)' }"
                 :contenteditable="editable"
                 @blur="onEdit($event, 'heading')"
             >{{ heading }}</h2>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="grid gap-8" :class="gridClass">
                 <div
                     v-for="(item, i) in items"
                     :key="i"

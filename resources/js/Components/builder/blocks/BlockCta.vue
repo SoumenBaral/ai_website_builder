@@ -4,6 +4,7 @@ const props = defineProps({
     subheading: String,
     ctaText: String,
     ctaHref: String,
+    align: { type: String, default: 'center' },
     editable: { type: Boolean, default: false },
     id: String,
 });
@@ -15,7 +16,7 @@ function onEdit(e, key) {
 </script>
 
 <template>
-    <section class="py-20 px-6 text-center text-white" :style="{ background: 'var(--primary)' }">
+    <section class="py-20 px-6 text-white" :class="align === 'left' ? 'text-left' : 'text-center'" :style="{ background: 'var(--primary)' }">
         <div class="max-w-3xl mx-auto">
             <h2
                 class="text-3xl md:text-4xl font-bold mb-4"
