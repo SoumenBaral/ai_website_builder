@@ -1,10 +1,15 @@
 <script setup>
 import { computed } from 'vue';
+import { useImageStyle } from '@/composables/useImageStyle.js';
 
 const props = defineProps({
     heading: String,
     plans: Array,
+    image: String,
     columns: { type: Number, default: 3 },
+    imageRadius: { type: String, default: '' },
+    imageShadow: { type: String, default: '' },
+    imageBorder: { type: String, default: '' },
     editable: { type: Boolean, default: false },
     id: String,
 });
@@ -14,6 +19,7 @@ const gridClass = computed(() => ({
     2: 'grid-cols-1 sm:grid-cols-2',
     3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
 }[props.columns] || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'));
+const { imageClasses } = useImageStyle(props);
 const emit = defineEmits(['update:props']);
 
 function onEdit(e, key) {
@@ -38,6 +44,8 @@ function onEditFeature(e, planIndex, featureIndex) {
 <template>
     <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
         <div class="max-w-6xl mx-auto">
+            <img v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-10" :class="imageClasses" />
+
             <h2
                 class="text-3xl md:text-4xl font-bold text-center mb-12"
                 :style="{ fontFamily: 'var(--font-heading)' }"

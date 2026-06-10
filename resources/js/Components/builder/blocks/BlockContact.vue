@@ -1,14 +1,22 @@
 <script setup>
+import { useImageStyle } from '@/composables/useImageStyle.js';
+
 const props = defineProps({
     heading: String,
     email: String,
     phone: String,
     address: String,
+    image: String,
     fields: Array,
     layout: { type: String, default: 'split' },
+    imageRadius: { type: String, default: '' },
+    imageShadow: { type: String, default: '' },
+    imageBorder: { type: String, default: '' },
     editable: { type: Boolean, default: false },
     id: String,
 });
+
+const { imageClasses } = useImageStyle(props);
 const emit = defineEmits(['update:props']);
 
 function onEdit(e, key) {
@@ -33,6 +41,8 @@ const fieldLabels = {
                 :contenteditable="editable"
                 @blur="onEdit($event, 'heading')"
             >{{ heading }}</h2>
+
+            <img v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-8" :class="imageClasses" />
 
             <div :class="layout === 'stacked' ? 'space-y-8' : 'grid grid-cols-1 md:grid-cols-2 gap-12'">
                 <div :class="layout === 'stacked' ? 'flex flex-wrap gap-6 justify-center' : ''">

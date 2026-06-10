@@ -1,15 +1,21 @@
 <script setup>
 import { computed } from 'vue';
+import { useImageStyle } from '@/composables/useImageStyle.js';
 
 const props = defineProps({
     heading: String,
     items: Array,
+    image: String,
     columns: { type: Number, default: 3 },
     align: { type: String, default: 'center' },
+    imageRadius: { type: String, default: '' },
+    imageShadow: { type: String, default: '' },
+    imageBorder: { type: String, default: '' },
     editable: { type: Boolean, default: false },
     id: String,
 });
 const emit = defineEmits(['update:props']);
+const { imageClasses } = useImageStyle(props);
 
 function onEdit(e, key) { emit('update:props', { [key]: e.target.innerText }); }
 function onEditItem(e, index, key) {
@@ -29,6 +35,9 @@ const gridClass = computed(() => ({
 <template>
     <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
         <div class="max-w-6xl mx-auto">
+            <!-- Header image -->
+            <img v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-10" :class="imageClasses" />
+
             <h2
                 class="text-3xl md:text-4xl font-bold mb-12"
                 :class="align === 'left' ? 'text-left' : 'text-center'"
@@ -40,23 +49,27 @@ const gridClass = computed(() => ({
             <div class="grid gap-8" :class="gridClass">
                 <div
                     v-for="(item, i) in items" :key="i"
-                    class="p-6 rounded-lg border border-gray-100 hover:shadow-lg transition-shadow"
+                    class="rounded-lg border border-gray-100 hover:shadow-lg transition-shadow overflow-hidden"
                     :class="align === 'left' ? 'text-left' : 'text-center'"
                     :style="{ borderRadius: 'var(--radius)' }"
                 >
-                    <div class="text-4xl mb-4">{{ item.icon }}</div>
-                    <h3
-                        class="text-xl font-semibold mb-2"
-                        :style="{ fontFamily: 'var(--font-heading)' }"
-                        :contenteditable="editable"
-                        @blur="onEditItem($event, i, 'title')"
-                    >{{ item.title }}</h3>
-                    <p
-                        class="opacity-70"
-                        :style="{ fontFamily: 'var(--font-body)' }"
-                        :contenteditable="editable"
-                        @blur="onEditItem($event, i, 'description')"
-                    >{{ item.description }}</p>
+                    <!-- Item image -->
+                    <img v-if="item.image" :src="item.image" :alt="item.title" class="w-full h-40 object-cover" />
+                    <div class="p-6">
+                        <div v-if="item.icon" class="text-4xl mb-4">{{ item.icon }}</div>
+                        <h3
+                            class="text-xl font-semibold mb-2"
+                            :style="{ fontFamily: 'var(--font-heading)' }"
+                            :contenteditable="editable"
+                            @blur="onEditItem($event, i, 'title')"
+                        >{{ item.title }}</h3>
+                        <p
+                            class="opacity-70"
+                            :style="{ fontFamily: 'var(--font-body)' }"
+                            :contenteditable="editable"
+                            @blur="onEditItem($event, i, 'description')"
+                        >{{ item.description }}</p>
+                    </div>
                 </div>
             </div>
         </div>

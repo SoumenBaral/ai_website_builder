@@ -4,6 +4,7 @@ import { computed } from 'vue';
 const props = defineProps({
     heading: String,
     items: Array,
+    image: String,
     columns: { type: Number, default: 4 },
     editable: { type: Boolean, default: false },
     id: String,
@@ -30,8 +31,12 @@ function onEditItem(e, index, key) {
 </script>
 
 <template>
-    <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
-        <div class="max-w-6xl mx-auto">
+    <section class="relative py-16 px-6 overflow-hidden" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
+        <template v-if="image">
+            <div class="absolute inset-0 bg-cover bg-center" :style="{ backgroundImage: `url(${image})` }"></div>
+            <div class="absolute inset-0 bg-black/60"></div>
+        </template>
+        <div class="relative z-10 max-w-6xl mx-auto">
             <h2
                 v-if="heading"
                 class="text-3xl md:text-4xl font-bold text-center mb-12"

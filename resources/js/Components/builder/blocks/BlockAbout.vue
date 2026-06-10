@@ -1,12 +1,19 @@
 <script setup>
+import { useImageStyle } from '@/composables/useImageStyle.js';
+
 const props = defineProps({
     heading: String,
     body: String,
     image: String,
     imagePosition: { type: String, default: 'right' },
+    imageRadius: { type: String, default: '' },
+    imageShadow: { type: String, default: '' },
+    imageBorder: { type: String, default: '' },
     editable: { type: Boolean, default: false },
     id: String,
 });
+
+const { imageClasses } = useImageStyle(props);
 const emit = defineEmits(['update:props']);
 
 function onEdit(e, key) {
@@ -35,8 +42,9 @@ function onEdit(e, key) {
                 <img
                     :src="image"
                     :alt="heading"
-                    class="w-full h-80 object-cover shadow-lg"
-                    :style="{ borderRadius: 'var(--radius)' }"
+                    class="w-full h-80 object-cover"
+                    :class="imageClasses || 'shadow-lg'"
+                    :style="imageClasses ? {} : { borderRadius: 'var(--radius)' }"
                 />
             </div>
         </div>

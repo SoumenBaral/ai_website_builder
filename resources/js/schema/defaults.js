@@ -33,6 +33,7 @@ export const BLOCK_TYPES = {
         icon: '✨',
         defaultProps: {
             heading: 'Our Features',
+            image: '',
             columns: 3,
             align: 'center',
             items: [
@@ -70,6 +71,7 @@ export const BLOCK_TYPES = {
         icon: '📧',
         defaultProps: {
             heading: 'Get in Touch',
+            image: '',
             email: 'hello@example.com',
             phone: '+1 234 567 890',
             fields: ['name', 'email', 'message'],
@@ -81,6 +83,7 @@ export const BLOCK_TYPES = {
         icon: '🛠️',
         defaultProps: {
             heading: 'Our Services',
+            image: '',
             columns: 3,
             align: 'center',
             items: [
@@ -108,6 +111,7 @@ export const BLOCK_TYPES = {
         icon: '💰',
         defaultProps: {
             heading: 'Simple Pricing',
+            image: '',
             columns: 3,
             plans: [
                 { name: 'Starter', price: '$9', period: '/month', features: ['1 Project', '5GB Storage', 'Email Support'], ctaText: 'Get Started', highlighted: false },
@@ -121,6 +125,7 @@ export const BLOCK_TYPES = {
         icon: '📊',
         defaultProps: {
             heading: 'By the Numbers',
+            image: '',
             columns: 4,
             items: [
                 { value: '500+', label: 'Projects Completed' },
@@ -135,6 +140,7 @@ export const BLOCK_TYPES = {
         icon: '❓',
         defaultProps: {
             heading: 'Frequently Asked Questions',
+            image: '',
             maxWidth: 'md',
             items: [
                 { question: 'How do I get started?', answer: 'Simply sign up for a free account and follow our getting started guide.' },
@@ -164,6 +170,7 @@ export const BLOCK_TYPES = {
             subheading: 'Join thousands of happy customers today.',
             ctaText: 'Start Now',
             ctaHref: '#',
+            image: '',
             align: 'center',
         },
     },

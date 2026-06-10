@@ -1,10 +1,15 @@
 <script setup>
 import { ref } from 'vue';
+import { useImageStyle } from '@/composables/useImageStyle.js';
 
 const props = defineProps({
     heading: String,
     items: Array,
+    image: String,
     maxWidth: { type: String, default: 'md' },
+    imageRadius: { type: String, default: '' },
+    imageShadow: { type: String, default: '' },
+    imageBorder: { type: String, default: '' },
     editable: { type: Boolean, default: false },
     id: String,
 });
@@ -15,6 +20,7 @@ const widthClass = {
     lg: 'max-w-5xl',
     full: 'max-w-6xl',
 };
+const { imageClasses } = useImageStyle(props);
 const emit = defineEmits(['update:props']);
 
 const openIndex = ref(null);
@@ -36,7 +42,7 @@ function onEditItem(e, index, key) {
 
 <template>
     <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
-        <div :class="[widthClass[maxWidth] || 'max-w-3xl', 'mx-auto']">
+        <div :class="[image ? 'max-w-6xl' : (widthClass[maxWidth] || 'max-w-3xl'), 'mx-auto']">
             <h2
                 class="text-3xl md:text-4xl font-bold text-center mb-12"
                 :style="{ fontFamily: 'var(--font-heading)' }"
@@ -44,6 +50,8 @@ function onEditItem(e, index, key) {
                 @blur="onEdit($event, 'heading')"
             >{{ heading }}</h2>
 
+            <div :class="image ? 'grid grid-cols-1 md:grid-cols-2 gap-10 items-start' : ''">
+            <img v-if="image" :src="image" alt="" class="w-full h-auto object-cover hidden md:block" :class="imageClasses" />
             <div class="space-y-4">
                 <div
                     v-for="(item, i) in items"
@@ -78,6 +86,7 @@ function onEditItem(e, index, key) {
                         >{{ item.answer }}</p>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     </section>

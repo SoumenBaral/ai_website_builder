@@ -11,23 +11,24 @@
             </h2>
         @endif
 
+        @if(!empty($props['image']))
+            <img src="{{ $props['image'] }}" alt="" class="w-full h-48 object-cover mb-10" style="border-radius: var(--radius);">
+        @endif
+
         <div class="grid {{ $gridClass }} gap-8">
             @if(!empty($props['items']))
                 @foreach($props['items'] as $item)
-                    <div class="p-6 shadow-md" style="border-radius: var(--radius); background-color: var(--bg); border: 1px solid rgba(0,0,0,0.1);">
-                        @if(!empty($item['icon']))
-                            <div class="text-4xl mb-4" style="color: var(--primary);">
-                                {!! $item['icon'] !!}
-                            </div>
+                    <div class="overflow-hidden shadow-md" style="border-radius: var(--radius); background-color: var(--bg); border: 1px solid rgba(0,0,0,0.1);">
+                        @if(!empty($item['image']))
+                            <img src="{{ $item['image'] }}" alt="{{ $item['title'] ?? '' }}" class="w-full h-40 object-cover">
                         @endif
-
-                        <h3 class="text-xl font-semibold mb-2" style="font-family: var(--font-heading);">
-                            {{ $item['title'] ?? '' }}
-                        </h3>
-
-                        <p class="opacity-80">
-                            {{ $item['description'] ?? '' }}
-                        </p>
+                        <div class="p-6">
+                            @if(!empty($item['icon']))
+                                <div class="text-4xl mb-4" style="color: var(--primary);">{!! $item['icon'] !!}</div>
+                            @endif
+                            <h3 class="text-xl font-semibold mb-2" style="font-family: var(--font-heading);">{{ $item['title'] ?? '' }}</h3>
+                            <p class="opacity-80">{{ $item['description'] ?? '' }}</p>
+                        </div>
                     </div>
                 @endforeach
             @endif

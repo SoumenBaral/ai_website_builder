@@ -222,11 +222,48 @@ const quickActions = computed(() => {
                 </div>
             </div>
 
+            <!-- Image Styling (show when block has an image set) -->
+            <div v-if="block.props.image || block.props.imageRadius || block.props.imageShadow || block.props.imageBorder" class="mb-4 pb-4 border-b border-gray-100 space-y-3">
+                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Image Style</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-medium text-gray-400">Radius</label>
+                        <select :value="block.props.imageRadius || ''" @change="update('imageRadius', $event.target.value)" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
+                            <option value="">Default</option>
+                            <option value="none">None</option>
+                            <option value="sm">Small</option>
+                            <option value="md">Medium</option>
+                            <option value="lg">Large</option>
+                            <option value="xl">XL</option>
+                            <option value="full">Full</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-medium text-gray-400">Shadow</label>
+                        <select :value="block.props.imageShadow || ''" @change="update('imageShadow', $event.target.value)" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
+                            <option value="">None</option>
+                            <option value="sm">Small</option>
+                            <option value="md">Medium</option>
+                            <option value="lg">Large</option>
+                            <option value="xl">XL</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-medium text-gray-400">Border</label>
+                        <select :value="block.props.imageBorder || ''" @change="update('imageBorder', $event.target.value)" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
+                            <option value="">None</option>
+                            <option value="thin">Thin</option>
+                            <option value="thick">Thick</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <div class="space-y-4">
                 <!-- String props -->
                 <template v-for="(value, key) in block.props" :key="key">
-                    <!-- Skip sectionBg (shown above), arrays and objects (handled separately) -->
-                    <div v-if="key === 'sectionBg' || key === 'sectionText'" class="hidden"></div>
+                    <!-- Skip styled props (shown above), arrays and objects (handled separately) -->
+                    <div v-if="['sectionBg','sectionText','imageRadius','imageShadow','imageBorder'].includes(key)" class="hidden"></div>
                     <div v-else-if="typeof value === 'string'" class="space-y-1">
                         <label class="text-xs font-medium text-gray-500 capitalize">{{ key }}</label>
                         <!-- Image props -->

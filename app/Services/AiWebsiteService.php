@@ -143,23 +143,31 @@ hero: { heading, subheading, ctaText, ctaHref, image, align ("center"|"left"|"ri
   - layout "center"/"left"/"right": full background image with text alignment
   - layout "split-left": image on LEFT, text on RIGHT (50/50 grid)
   - layout "split-right": text on LEFT, image on RIGHT (50/50 grid)
-features: { heading, items [{icon (emoji), title, description}], columns (1-4, default 3), align ("center"|"left") }
+features: { heading, image (optional header image), items [{icon (emoji), title, description, image (optional item image URL)}], columns (1-4, default 3), align ("center"|"left") }
 gallery: { heading, columns (2-4), images [{src, caption}] }
 about: { heading, body, image, imagePosition ("left"|"right", default "right") }
-services: { heading, items [{icon (emoji), title, description}], columns (1-4, default 3), align ("center"|"left") }
+services: { heading, image (optional header image), items [{icon (emoji), title, description, image (optional item image URL)}], columns (1-4, default 3), align ("center"|"left") }
 testimonials: { heading, items [{quote, author, role, image}], columns (1-3, default 3) }
-pricing: { heading, plans [{name, price, period, features (string[]), cta, highlighted (bool)}], columns (1-3, default 3) }
-stats: { heading, items [{value, label}], columns (2-6, default 4) }
-faq: { heading, items [{question, answer}], maxWidth ("sm"|"md"|"lg"|"full", default "md") }
+pricing: { heading, image (optional header image), plans [{name, price, period, features (string[]), cta, highlighted (bool)}], columns (1-3, default 3) }
+stats: { heading, image (optional background image with dark overlay), items [{value, label}], columns (2-6, default 4) }
+faq: { heading, image (optional side image, creates 2-col layout), items [{question, answer}], maxWidth ("sm"|"md"|"lg"|"full", default "md") }
 team: { heading, members [{name, role, image, bio}], columns (1-4, default 4) }
-cta: { heading, subheading, ctaText, ctaHref, align ("center"|"left") }
-contact: { heading, subheading, email, phone, address, fields (string[]), layout ("split"|"stacked", default "split") }
+cta: { heading, subheading, ctaText, ctaHref, image (optional background image with overlay), align ("center"|"left") }
+contact: { heading, subheading, image (optional top image), email, phone, address, fields (string[]), layout ("split"|"stacked", default "split") }
 footer: { brand, links [{label, href}], copyright, socials [{platform, url}] }
+
+NOTE: ALL blocks now support an optional `image` prop. Use it to add visual richness.
 
 STYLING PROPS (available on ALL section types):
 - sectionBg: custom background color (hex like "#1e293b" or any CSS color)
 - sectionText: custom text color (hex like "#ffffff")
-These override the global theme for that section only. Use them to create contrast (dark hero, colored CTA, alternating sections).
+These override the global theme for that section only.
+
+IMAGE STYLING PROPS (available on blocks that display images):
+- imageRadius: "none" | "sm" | "md" | "lg" | "xl" | "full" — controls border-radius of the image
+- imageShadow: "none" | "sm" | "md" | "lg" | "xl" — adds shadow to the image
+- imageBorder: "none" | "thin" | "thick" — adds border around the image
+Example: imageRadius "full" + imageShadow "lg" = circular image with large shadow
 
 LAYOUT TIPS:
 - Use "split-left"/"split-right" for hero to create modern side-by-side layouts
@@ -168,9 +176,12 @@ LAYOUT TIPS:
 - Set align "left" for a more editorial/blog feel, "center" for landing pages
 - Use minHeight "full" for full-screen hero sections
 - Use layout "stacked" on contact for a centered single-column form
+- Add image to CTA/stats sections for dramatic background effects
+- Add image to FAQ for a visual 2-column layout
 
 IMAGES:
 - Use "PLACEHOLDER:<short description>" for new images — server replaces with real Unsplash photos.
+- Set imageRadius, imageShadow, imageBorder to style images (round, shadow, border).
 REF;
     }
 

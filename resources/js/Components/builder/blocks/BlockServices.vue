@@ -1,11 +1,16 @@
 <script setup>
 import { computed } from 'vue';
+import { useImageStyle } from '@/composables/useImageStyle.js';
 
 const props = defineProps({
     heading: String,
     items: Array,
+    image: String,
     columns: { type: Number, default: 3 },
     align: { type: String, default: 'center' },
+    imageRadius: { type: String, default: '' },
+    imageShadow: { type: String, default: '' },
+    imageBorder: { type: String, default: '' },
     editable: { type: Boolean, default: false },
     id: String,
 });
@@ -16,6 +21,7 @@ const gridClass = computed(() => ({
     3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
     4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
 }[props.columns] || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'));
+const { imageClasses } = useImageStyle(props);
 const emit = defineEmits(['update:props']);
 
 function onEdit(e, key) {
@@ -40,14 +46,19 @@ function onEditItem(e, index, key) {
                 @blur="onEdit($event, 'heading')"
             >{{ heading }}</h2>
 
+            <img v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-10" :class="imageClasses" />
+
             <div class="grid gap-8" :class="gridClass">
                 <div
                     v-for="(item, i) in items"
                     :key="i"
-                    class="p-8 border border-gray-200 hover:shadow-xl transition-all duration-300 group"
+                    class="border border-gray-200 hover:shadow-xl transition-all duration-300 group overflow-hidden"
                     :style="{ borderRadius: 'var(--radius)', background: 'var(--bg)' }"
                 >
+                    <img v-if="item.image" :src="item.image" :alt="item.title" class="w-full h-40 object-cover" />
+                    <div class="p-8">
                     <div
+                        v-if="item.icon"
                         class="w-14 h-14 flex items-center justify-center text-3xl mb-5 rounded-lg"
                         :style="{ background: 'color-mix(in srgb, var(--primary) 12%, transparent)', borderRadius: 'var(--radius)' }"
                     >{{ item.icon }}</div>
@@ -70,6 +81,7 @@ function onEditItem(e, index, key) {
                         :contenteditable="editable"
                         @blur="onEditItem($event, i, 'price')"
                     >{{ item.price }}</p>
+                    </div>
                 </div>
             </div>
         </div>
