@@ -30,7 +30,7 @@ class AiWebsiteService
                 'type' => 'json_schema',
                 'json_schema' => [
                     'name' => 'website_schema',
-                    'strict' => true,
+                    'strict' => false,
                     'schema' => $this->jsonSchema(),
                 ],
             ],
@@ -71,7 +71,7 @@ class AiWebsiteService
                 'type' => 'json_schema',
                 'json_schema' => [
                     'name' => 'website_schema',
-                    'strict' => true,
+                    'strict' => false,
                     'schema' => $this->jsonSchema(),
                 ],
             ],

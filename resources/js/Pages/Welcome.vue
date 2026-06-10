@@ -1,386 +1,820 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
+import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue';
 
 defineProps({
-    canLogin: {
-        type: Boolean,
-    },
-    canRegister: {
-        type: Boolean,
-    },
-    laravelVersion: {
-        type: String,
-        required: true,
-    },
-    phpVersion: {
-        type: String,
-        required: true,
-    },
+    canLogin: { type: Boolean },
+    canRegister: { type: Boolean },
+    laravelVersion: { type: String, required: true },
+    phpVersion: { type: String, required: true },
 });
 
-function handleImageError() {
-    document.getElementById('screenshot-container')?.classList.add('!hidden');
-    document.getElementById('docs-card')?.classList.add('!row-span-1');
-    document.getElementById('docs-card-content')?.classList.add('!flex-row');
-    document.getElementById('background')?.classList.add('!hidden');
+const mobileMenuOpen = ref(false);
+const navScrolled = ref(false);
+const mouse = reactive({ x: 0, y: 0 });
+const scrollY = ref(0);
+
+// Typing animation for hero subtitle
+const typedTexts = [
+    'a photography portfolio',
+    'a SaaS landing page',
+    'a restaurant website',
+    'an online store',
+    'a startup homepage',
+];
+const currentTypedIndex = ref(0);
+const currentTypedText = ref('');
+const isDeleting = ref(false);
+let typeTimer = null;
+
+function typeEffect() {
+    const fullText = typedTexts[currentTypedIndex.value];
+    if (!isDeleting.value) {
+        currentTypedText.value = fullText.substring(0, currentTypedText.value.length + 1);
+        if (currentTypedText.value === fullText) {
+            setTimeout(() => { isDeleting.value = true; typeEffect(); }, 2000);
+            return;
+        }
+    } else {
+        currentTypedText.value = fullText.substring(0, currentTypedText.value.length - 1);
+        if (currentTypedText.value === '') {
+            isDeleting.value = false;
+            currentTypedIndex.value = (currentTypedIndex.value + 1) % typedTexts.length;
+        }
+    }
+    typeTimer = setTimeout(typeEffect, isDeleting.value ? 40 : 80);
+}
+
+function handleScroll() {
+    navScrolled.value = window.scrollY > 20;
+    scrollY.value = window.scrollY;
+}
+
+function handleMouseMove(e) {
+    mouse.x = (e.clientX / window.innerWidth - 0.5) * 2;
+    mouse.y = (e.clientY / window.innerHeight - 0.5) * 2;
+}
+
+// Parallax for hero elements
+const heroParallax = computed(() => scrollY.value * 0.3);
+
+onMounted(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    handleScroll();
+    typeEffect();
+
+    nextTick(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('animate-visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            },
+            { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+        );
+        document.querySelectorAll('.animate-on-scroll').forEach((el) => observer.observe(el));
+    });
+});
+
+onUnmounted(() => {
+    window.removeEventListener('scroll', handleScroll);
+    window.removeEventListener('mousemove', handleMouseMove);
+    if (typeTimer) clearTimeout(typeTimer);
+});
+
+const features = [
+    {
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>`,
+        title: 'AI-Powered Generation',
+        desc: 'Describe your website in plain English and watch AI build it in seconds. No coding skills required.',
+        color: 'indigo',
+    },
+    {
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-7"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>`,
+        title: 'Visual Editor',
+        desc: 'Fine-tune every detail with our intuitive visual editor. Inline editing, drag & drop, and real-time preview.',
+        color: 'violet',
+    },
+    {
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-7"><path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.58-5.84a14.927 14.927 0 0 1-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" /></svg>`,
+        title: 'One-Click Publish',
+        desc: 'Export as HTML/ZIP or publish instantly with a shareable link. Your site goes live in one click.',
+        color: 'emerald',
+    },
+    {
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-7"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z" /></svg>`,
+        title: '14+ Block Types',
+        desc: 'Navbar, hero, features, gallery, pricing, testimonials, FAQ, team, and more — all ready to use.',
+        color: 'blue',
+    },
+    {
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-7"><path stroke-linecap="round" stroke-linejoin="round" d="M4.098 19.902a3.75 3.75 0 0 0 5.304 0l6.401-6.402M6.75 21A3.75 3.75 0 0 1 3 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 0 0 3.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008Z" /></svg>`,
+        title: 'Theme Customization',
+        desc: 'Colors, fonts, border radius, dark/light mode — customize every aspect of your site\'s look and feel.',
+        color: 'pink',
+    },
+    {
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-7"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>`,
+        title: 'Version History',
+        desc: 'Every change is saved. Browse your revision history and restore any previous version with one click.',
+        color: 'amber',
+    },
+];
+
+const featureColors = {
+    indigo: { bg: 'bg-indigo-50', border: 'border-indigo-100', text: 'text-indigo-600', shadow: 'shadow-indigo-500/15', glow: 'from-indigo-100/60 to-indigo-50/30' },
+    violet: { bg: 'bg-violet-50', border: 'border-violet-100', text: 'text-violet-600', shadow: 'shadow-violet-500/15', glow: 'from-violet-100/60 to-violet-50/30' },
+    emerald: { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-600', shadow: 'shadow-emerald-500/15', glow: 'from-emerald-100/60 to-emerald-50/30' },
+    blue: { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-600', shadow: 'shadow-blue-500/15', glow: 'from-blue-100/60 to-blue-50/30' },
+    pink: { bg: 'bg-pink-50', border: 'border-pink-100', text: 'text-pink-600', shadow: 'shadow-pink-500/15', glow: 'from-pink-100/60 to-pink-50/30' },
+    amber: { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-600', shadow: 'shadow-amber-500/15', glow: 'from-amber-100/60 to-amber-50/30' },
+};
+
+const steps = [
+    { num: '01', title: 'Describe Your Website', desc: 'Type a prompt like "A modern portfolio for a photographer" and let AI understand your vision.', icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg>` },
+    { num: '02', title: 'AI Builds It Instantly', desc: 'Our AI generates a complete, multi-section website with real content, images, and styling.', icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>` },
+    { num: '03', title: 'Customize & Publish', desc: 'Fine-tune with the visual editor, adjust themes, then publish or export with one click.', icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.58-5.84a14.927 14.927 0 0 1-2.58 5.84" /></svg>` },
+];
+
+const plans = [
+    { name: 'Free', price: '$0', period: '/month', features: ['10 AI generations/mo', 'All 14+ block types', 'HTML/ZIP export', 'Publish with shared link', 'Version history'], cta: 'Get Started Free', highlight: false },
+    { name: 'Pro', price: '$19', period: '/month', features: ['100 AI generations/mo', 'Everything in Free', 'Priority AI processing', 'Analytics dashboard', 'Custom themes'], cta: 'Upgrade to Pro', highlight: true },
+    { name: 'Team', price: '$49', period: '/month', features: ['500 AI generations/mo', 'Everything in Pro', 'Team collaboration', 'Priority support', 'Custom branding'], cta: 'Start Team Plan', highlight: false },
+];
+
+const stats = [
+    { value: '10K+', label: 'Websites Built', icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5a17.92 17.92 0 0 1-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" /></svg>` },
+    { value: '14+', label: 'Block Types', icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z" /></svg>` },
+    { value: '< 30s', label: 'Build Time', icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>` },
+    { value: '99.9%', label: 'Uptime', icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>` },
+];
+
+function scrollTo(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    mobileMenuOpen.value = false;
 }
 </script>
 
 <template>
-    <Head title="Welcome" />
-    <div class="bg-gray-50 text-black/50 dark:bg-black dark:text-white/50">
-        <img
-            id="background"
-            class="absolute -left-20 top-0 max-w-[877px]"
-            src="https://laravel.com/assets/img/welcome/background.svg"
-        />
-        <div
-            class="relative flex min-h-screen flex-col items-center justify-center selection:bg-[#FF2D20] selection:text-white"
-        >
-            <div class="relative w-full max-w-2xl px-6 lg:max-w-7xl">
-                <header
-                    class="grid grid-cols-2 items-center gap-2 py-10 lg:grid-cols-3"
-                >
-                    <div class="flex lg:col-start-2 lg:justify-center">
-                        <svg
-                            class="h-12 w-auto text-white lg:h-16 lg:text-[#FF2D20]"
-                            viewBox="0 0 62 65"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path
-                                d="M61.8548 14.6253C61.8778 14.7102 61.8895 14.7978 61.8897 14.8858V28.5615C61.8898 28.737 61.8434 28.9095 61.7554 29.0614C61.6675 29.2132 61.5409 29.3392 61.3887 29.4265L49.9104 36.0351V49.1337C49.9104 49.4902 49.7209 49.8192 49.4118 49.9987L25.4519 63.7916C25.3971 63.8227 25.3372 63.8427 25.2774 63.8639C25.255 63.8714 25.2338 63.8851 25.2101 63.8913C25.0426 63.9354 24.8666 63.9354 24.6991 63.8913C24.6716 63.8838 24.6467 63.8689 24.6205 63.8589C24.5657 63.8389 24.5084 63.8215 24.456 63.7916L0.501061 49.9987C0.348882 49.9113 0.222437 49.7853 0.134469 49.6334C0.0465019 49.4816 0.000120578 49.3092 0 49.1337L0 8.10652C0 8.01678 0.0124642 7.92953 0.0348998 7.84477C0.0423783 7.8161 0.0598282 7.78993 0.0697995 7.76126C0.0884958 7.70891 0.105946 7.65531 0.133367 7.6067C0.152063 7.5743 0.179485 7.54812 0.20192 7.51821C0.230588 7.47832 0.256763 7.43719 0.290416 7.40229C0.319084 7.37362 0.356476 7.35243 0.388883 7.32751C0.425029 7.29759 0.457436 7.26518 0.498568 7.2415L12.4779 0.345059C12.6296 0.257786 12.8015 0.211853 12.9765 0.211853C13.1515 0.211853 13.3234 0.257786 13.475 0.345059L25.4531 7.2415H25.4556C25.4955 7.26643 25.5292 7.29759 25.5653 7.32626C25.5977 7.35119 25.6339 7.37362 25.6625 7.40104C25.6974 7.43719 25.7224 7.47832 25.7523 7.51821C25.7735 7.54812 25.8021 7.5743 25.8196 7.6067C25.8483 7.65656 25.8645 7.70891 25.8844 7.76126C25.8944 7.78993 25.9118 7.8161 25.9193 7.84602C25.9423 7.93096 25.954 8.01853 25.9542 8.10652V33.7317L35.9355 27.9844V14.8846C35.9355 14.7973 35.948 14.7088 35.9704 14.6253C35.9792 14.5954 35.9954 14.5692 36.0053 14.5405C36.0253 14.4882 36.0427 14.4346 36.0702 14.386C36.0888 14.3536 36.1163 14.3274 36.1375 14.2975C36.1674 14.2576 36.1923 14.2165 36.2272 14.1816C36.2559 14.1529 36.292 14.1317 36.3244 14.1068C36.3618 14.0769 36.3942 14.0445 36.4341 14.0208L48.4147 7.12434C48.5663 7.03694 48.7383 6.99094 48.9133 6.99094C49.0883 6.99094 49.2602 7.03694 49.4118 7.12434L61.3899 14.0208C61.4323 14.0457 61.4647 14.0769 61.5021 14.1055C61.5333 14.1305 61.5694 14.1529 61.5981 14.1803C61.633 14.2165 61.6579 14.2576 61.6878 14.2975C61.7103 14.3274 61.7377 14.3536 61.7551 14.386C61.7838 14.4346 61.8 14.4882 61.8199 14.5405C61.8312 14.5692 61.8474 14.5954 61.8548 14.6253ZM59.893 27.9844V16.6121L55.7013 19.0252L49.9104 22.3593V33.7317L59.8942 27.9844H59.893ZM47.9149 48.5566V37.1768L42.2187 40.4299L25.953 49.7133V61.2003L47.9149 48.5566ZM1.99677 9.83281V48.5566L23.9562 61.199V49.7145L12.4841 43.2219L12.4804 43.2194L12.4754 43.2169C12.4368 43.1945 12.4044 43.1621 12.3682 43.1347C12.3371 43.1097 12.3009 43.0898 12.2735 43.0624L12.271 43.0586C12.2386 43.0275 12.2162 42.9888 12.1887 42.9539C12.1638 42.9203 12.1339 42.8916 12.114 42.8567L12.1127 42.853C12.0903 42.8156 12.0766 42.7707 12.0604 42.7283C12.0442 42.6909 12.023 42.656 12.013 42.6161C12.0005 42.5688 11.998 42.5177 11.9931 42.4691C11.9881 42.4317 11.9781 42.3943 11.9781 42.3569V15.5801L6.18848 12.2446L1.99677 9.83281ZM12.9777 2.36177L2.99764 8.10652L12.9752 13.8513L22.9541 8.10527L12.9752 2.36177H12.9777ZM18.1678 38.2138L23.9574 34.8809V9.83281L19.7657 12.2459L13.9749 15.5801V40.6281L18.1678 38.2138ZM48.9133 9.14105L38.9344 14.8858L48.9133 20.6305L58.8909 14.8846L48.9133 9.14105ZM47.9149 22.3593L42.124 19.0252L37.9323 16.6121V27.9844L43.7219 31.3174L47.9149 33.7317V22.3593ZM24.9533 47.987L39.59 39.631L46.9065 35.4555L36.9352 29.7145L25.4544 36.3242L14.9907 42.3482L24.9533 47.987Z"
-                                fill="currentColor"
-                            />
+    <Head title="AiWebBuilder — Build Stunning Websites with AI in Seconds" />
+
+    <div class="min-h-screen bg-white antialiased text-gray-900 overflow-x-hidden">
+        <!-- ===== ANIMATED BACKGROUND ===== -->
+        <div class="fixed inset-0 -z-10 overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-b from-white via-slate-50/50 to-white"></div>
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+            <div class="orb orb-3"></div>
+            <div class="orb orb-4"></div>
+            <div class="orb orb-5"></div>
+            <div class="absolute inset-0 dot-grid"></div>
+            <div class="aurora aurora-1"></div>
+            <div class="aurora aurora-2"></div>
+        </div>
+
+        <!-- Floating sparkle particles -->
+        <div class="fixed inset-0 -z-[5] overflow-hidden pointer-events-none">
+            <div v-for="n in 12" :key="n" :class="`particle particle-${n}`"></div>
+        </div>
+
+        <!-- ===== NAVBAR ===== -->
+        <nav :class="[
+            'fixed top-0 z-50 w-full transition-all duration-700',
+            navScrolled
+                ? 'py-2 border-b border-gray-200/50 bg-white/70 backdrop-blur-2xl shadow-[0_8px_30px_rgba(99,102,241,0.06)]'
+                : 'py-1 bg-transparent'
+        ]">
+            <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+                <Link href="/" class="group flex items-center gap-2.5">
+                    <div class="logo-3d relative flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-600 shadow-xl shadow-indigo-500/30 transition-all duration-500 group-hover:shadow-indigo-500/50 group-hover:scale-110 group-hover:-rotate-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="white" class="size-5 drop-shadow-sm">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
                         </svg>
                     </div>
-                    <nav v-if="canLogin" class="-mx-3 flex flex-1 justify-end">
-                        <Link
-                            v-if="$page.props.auth.user"
-                            :href="route('dashboard')"
-                            class="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
-                        >
-                            Dashboard
-                        </Link>
+                    <span class="text-xl font-bold tracking-tight">Ai<span class="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">Web</span>Builder</span>
+                </Link>
 
-                        <template v-else>
-                            <Link
-                                :href="route('login')"
-                                class="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
-                            >
-                                Log in
-                            </Link>
+                <div class="hidden items-center gap-8 md:flex">
+                    <button v-for="item in [{id:'features',l:'Features'},{id:'how-it-works',l:'How It Works'},{id:'pricing',l:'Pricing'}]" :key="item.id" @click="scrollTo(item.id)" class="nav-link text-sm font-medium text-gray-500 transition hover:text-gray-900">{{ item.l }}</button>
+                    <a href="/demo" target="_blank" rel="noopener" class="nav-link text-sm font-medium text-gray-500 transition hover:text-gray-900">Demo</a>
+                </div>
 
-                            <Link
-                                v-if="canRegister"
-                                :href="route('register')"
-                                class="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
-                            >
-                                Register
-                            </Link>
-                        </template>
-                    </nav>
-                </header>
+                <div class="hidden items-center gap-3 md:flex" v-if="canLogin">
+                    <Link v-if="$page.props.auth.user" :href="route('dashboard')" class="btn-3d rounded-xl px-6 py-2.5 text-sm font-semibold text-white">Dashboard</Link>
+                    <template v-else>
+                        <Link :href="route('login')" class="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:text-indigo-600 hover:bg-indigo-50/80">Log in</Link>
+                        <Link v-if="canRegister" :href="route('register')" class="btn-3d rounded-xl px-6 py-2.5 text-sm font-semibold text-white">Get Started</Link>
+                    </template>
+                </div>
 
-                <main class="mt-6">
-                    <div class="grid gap-6 lg:grid-cols-2 lg:gap-8">
-                        <a
-                            href="https://laravel.com/docs"
-                            id="docs-card"
-                            class="flex flex-col items-start gap-6 overflow-hidden rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] transition duration-300 hover:text-black/70 hover:ring-black/20 focus:outline-none focus-visible:ring-[#FF2D20] md:row-span-3 lg:p-10 lg:pb-10 dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:text-white/70 dark:hover:ring-zinc-700 dark:focus-visible:ring-[#FF2D20]"
-                        >
-                            <div
-                                id="screenshot-container"
-                                class="relative flex w-full flex-1 items-stretch"
-                            >
-                                <img
-                                    src="https://laravel.com/assets/img/welcome/docs-light.svg"
-                                    alt="Laravel documentation screenshot"
-                                    class="aspect-video h-full w-full flex-1 rounded-[10px] object-cover object-top drop-shadow-[0px_4px_34px_rgba(0,0,0,0.06)] dark:hidden"
-                                    @error="handleImageError"
-                                />
-                                <img
-                                    src="https://laravel.com/assets/img/welcome/docs-dark.svg"
-                                    alt="Laravel documentation screenshot"
-                                    class="hidden aspect-video h-full w-full flex-1 rounded-[10px] object-cover object-top drop-shadow-[0px_4px_34px_rgba(0,0,0,0.25)] dark:block"
-                                />
-                                <div
-                                    class="absolute -bottom-16 -left-16 h-40 w-[calc(100%+8rem)] bg-gradient-to-b from-transparent via-white to-white dark:via-zinc-900 dark:to-zinc-900"
-                                ></div>
+                <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden rounded-xl p-2.5 text-gray-500 transition hover:bg-gray-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path v-if="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                        <path v-else stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 -translate-y-3 scale-95" enter-to-class="opacity-100 translate-y-0 scale-100" leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100 translate-y-0 scale-100" leave-to-class="opacity-0 -translate-y-3 scale-95">
+                <div v-if="mobileMenuOpen" class="border-t border-gray-100 bg-white/95 backdrop-blur-2xl px-6 py-6 md:hidden shadow-2xl shadow-gray-200/20">
+                    <div class="flex flex-col gap-4">
+                        <button @click="scrollTo('features')" class="text-left text-base font-medium text-gray-600">Features</button>
+                        <button @click="scrollTo('how-it-works')" class="text-left text-base font-medium text-gray-600">How It Works</button>
+                        <button @click="scrollTo('pricing')" class="text-left text-base font-medium text-gray-600">Pricing</button>
+                        <a href="/demo" target="_blank" rel="noopener" class="text-base font-medium text-gray-600">Demo</a>
+                        <div v-if="canLogin" class="mt-3 flex flex-col gap-3 border-t border-gray-100 pt-5">
+                            <Link v-if="$page.props.auth.user" :href="route('dashboard')" class="btn-3d rounded-xl px-5 py-3 text-center text-sm font-semibold text-white">Dashboard</Link>
+                            <template v-else>
+                                <Link :href="route('login')" class="rounded-xl border border-gray-200 px-5 py-3 text-center text-sm font-semibold text-gray-600">Log in</Link>
+                                <Link v-if="canRegister" :href="route('register')" class="btn-3d rounded-xl px-5 py-3 text-center text-sm font-semibold text-white">Get Started</Link>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </nav>
+
+        <!-- ===== HERO ===== -->
+        <section class="relative pt-36 pb-20 lg:pt-52 lg:pb-40 overflow-hidden">
+            <div class="mx-auto max-w-7xl px-6 text-center" :style="{ transform: `translateY(${-heroParallax * 0.15}px)` }">
+                <!-- Badge -->
+                <div class="hero-badge inline-flex items-center gap-2.5 rounded-full border border-indigo-200/70 bg-white/90 backdrop-blur-md px-5 py-2.5 text-sm font-medium text-indigo-600 shadow-xl shadow-indigo-500/[0.06] mb-10 hover:shadow-indigo-500/10 transition-shadow duration-500">
+                    <span class="relative flex size-2">
+                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
+                        <span class="relative inline-flex size-2 rounded-full bg-green-500"></span>
+                    </span>
+                    Best Website Builder with AI
+                </div>
+
+                <h1 class="hero-title mx-auto max-w-5xl text-5xl font-extrabold tracking-tight sm:text-6xl lg:text-8xl leading-[1.05]">
+                    <span class="text-gray-900 drop-shadow-sm">Build Stunning</span>
+                    <br />
+                    <span class="text-gray-900 drop-shadow-sm">Websites </span>
+                    <span class="hero-gradient-text bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-500 bg-clip-text text-transparent drop-shadow-sm">with AI</span>
+                </h1>
+
+                <!-- Typing animation subtitle -->
+                <div class="hero-subtitle mx-auto mt-8 max-w-2xl text-lg text-gray-500 leading-relaxed sm:text-xl">
+                    <p>Describe your dream website and watch AI create it instantly.</p>
+                    <p class="mt-2">
+                        Try: <span class="font-medium text-indigo-600">"Build me {{ currentTypedText }}"</span><span class="typing-cursor">|</span>
+                    </p>
+                </div>
+
+                <div class="hero-buttons mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+                    <Link v-if="canRegister" :href="route('register')" class="btn-3d-hero group relative inline-flex items-center gap-2 overflow-hidden rounded-2xl px-10 py-5 text-lg font-semibold text-white transition-all duration-300 hover:-translate-y-1.5">
+                        <span class="relative z-10">Start Building Free</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="relative z-10 size-5 transition-transform duration-300 group-hover:translate-x-1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                        </svg>
+                        <div class="btn-shine absolute inset-0"></div>
+                    </Link>
+                    <a href="/demo" target="_blank" rel="noopener" class="group inline-flex items-center gap-3 rounded-2xl border border-gray-200/80 bg-white/80 backdrop-blur-sm px-10 py-5 text-lg font-semibold text-gray-700 shadow-xl shadow-gray-200/40 transition-all duration-300 hover:border-indigo-200 hover:shadow-indigo-100/50 hover:bg-white hover:text-indigo-600 hover:-translate-y-1">
+                        <div class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50 shadow-inner transition-all duration-300 group-hover:shadow-indigo-200/50 group-hover:scale-110">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-5 text-indigo-600">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                            </svg>
+                        </div>
+                        See Demo
+                    </a>
+                </div>
+
+                <!-- Stats with 3D cards -->
+                <div class="hero-stats mx-auto mt-20 grid max-w-4xl grid-cols-2 gap-5 sm:grid-cols-4">
+                    <div v-for="(stat, i) in stats" :key="stat.label"
+                         class="stat-card group relative rounded-2xl bg-white/80 backdrop-blur-md border border-gray-100/80 px-5 py-6 text-center transition-all duration-500 hover:-translate-y-2 cursor-default"
+                         :style="{ animationDelay: `${0.7 + i * 0.1}s` }">
+                        <div class="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-50/50 to-violet-50/30 opacity-0 transition-opacity duration-500 group-hover:opacity-100"></div>
+                        <div class="relative">
+                            <div class="mx-auto mb-2 flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50 text-indigo-500 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6" v-html="stat.icon"></div>
+                            <div class="text-2xl font-extrabold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">{{ stat.value }}</div>
+                            <div class="mt-1 text-xs font-medium text-gray-400 uppercase tracking-wider">{{ stat.label }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Editor mockup with 3D tilt -->
+                <div class="hero-mockup relative mx-auto mt-24 max-w-5xl"
+                     :style="{ transform: `perspective(1400px) rotateX(${mouse.y * 1.5}deg) rotateY(${mouse.x * -1.5}deg)` }">
+                    <div class="mockup-3d rounded-3xl border border-gray-200/60 bg-gray-950 p-1.5 sm:p-2">
+                        <div class="flex items-center gap-2 px-4 py-3">
+                            <div class="size-3.5 rounded-full bg-[#ff5f57] shadow-sm shadow-red-500/30"></div>
+                            <div class="size-3.5 rounded-full bg-[#febc2e] shadow-sm shadow-yellow-500/30"></div>
+                            <div class="size-3.5 rounded-full bg-[#28c840] shadow-sm shadow-green-500/30"></div>
+                            <div class="ml-4 flex-1 rounded-lg bg-gray-800/80 px-4 py-1.5 text-xs text-gray-400">
+                                <span class="text-gray-500">https://</span>aiwebbuilder.app/editor
                             </div>
-
-                            <div
-                                class="relative flex items-center gap-6 lg:items-end"
-                            >
-                                <div
-                                    id="docs-card-content"
-                                    class="flex items-start gap-6 lg:flex-col"
-                                >
-                                    <div
-                                        class="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#FF2D20]/10 sm:size-16"
-                                    >
-                                        <svg
-                                            class="size-5 sm:size-6"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                fill="#FF2D20"
-                                                d="M23 4a1 1 0 0 0-1.447-.894L12.224 7.77a.5.5 0 0 1-.448 0L2.447 3.106A1 1 0 0 0 1 4v13.382a1.99 1.99 0 0 0 1.105 1.79l9.448 4.728c.14.065.293.1.447.1.154-.005.306-.04.447-.105l9.453-4.724a1.99 1.99 0 0 0 1.1-1.789V4ZM3 6.023a.25.25 0 0 1 .362-.223l7.5 3.75a.251.251 0 0 1 .138.223v11.2a.25.25 0 0 1-.362.224l-7.5-3.75a.25.25 0 0 1-.138-.22V6.023Zm18 11.2a.25.25 0 0 1-.138.224l-7.5 3.75a.249.249 0 0 1-.329-.099.249.249 0 0 1-.033-.12V9.772a.251.251 0 0 1 .138-.224l7.5-3.75a.25.25 0 0 1 .362.224v11.2Z"
-                                            />
-                                            <path
-                                                fill="#FF2D20"
-                                                d="m3.55 1.893 8 4.048a1.008 1.008 0 0 0 .9 0l8-4.048a1 1 0 0 0-.9-1.785l-7.322 3.706a.506.506 0 0 1-.452 0L4.454.108a1 1 0 0 0-.9 1.785H3.55Z"
-                                            />
-                                        </svg>
+                        </div>
+                        <div class="flex rounded-b-2xl bg-gray-900 overflow-hidden" style="height: 380px;">
+                            <div class="hidden w-56 border-r border-gray-800/80 p-4 sm:block">
+                                <div class="mb-4 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600">Blocks</div>
+                                <div class="space-y-1.5">
+                                    <div class="mockup-block-active rounded-lg bg-violet-500/10 px-3 py-2.5 text-sm text-violet-400 border border-violet-500/20 flex items-center gap-2 shadow-sm shadow-violet-500/10">
+                                        <div class="size-2 rounded-full bg-violet-400 shadow-sm shadow-violet-400/50"></div>
+                                        Navbar
                                     </div>
-
-                                    <div class="pt-3 sm:pt-5 lg:pt-0">
-                                        <h2
-                                            class="text-xl font-semibold text-black dark:text-white"
-                                        >
-                                            Documentation
-                                        </h2>
-
-                                        <p class="mt-4 text-sm/relaxed">
-                                            Laravel has wonderful documentation
-                                            covering every aspect of the
-                                            framework. Whether you are a
-                                            newcomer or have prior experience
-                                            with Laravel, we recommend reading
-                                            our documentation from beginning to
-                                            end.
-                                        </p>
+                                    <div v-for="block in ['Hero', 'Features', 'Pricing', 'Contact', 'Footer']" :key="block" class="rounded-lg bg-white/[0.02] px-3 py-2.5 text-sm text-gray-500 flex items-center gap-2 transition hover:bg-white/[0.04]">
+                                        <div class="size-2 rounded-full bg-gray-700"></div>
+                                        {{ block }}
                                     </div>
                                 </div>
-
-                                <svg
-                                    class="size-6 shrink-0 stroke-[#FF2D20]"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke-width="1.5"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-                                    />
-                                </svg>
                             </div>
-                        </a>
-
-                        <a
-                            href="https://laracasts.com"
-                            class="flex items-start gap-4 rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] transition duration-300 hover:text-black/70 hover:ring-black/20 focus:outline-none focus-visible:ring-[#FF2D20] lg:pb-10 dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:text-white/70 dark:hover:ring-zinc-700 dark:focus-visible:ring-[#FF2D20]"
-                        >
-                            <div
-                                class="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#FF2D20]/10 sm:size-16"
-                            >
-                                <svg
-                                    class="size-5 sm:size-6"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <g fill="#FF2D20">
-                                        <path
-                                            d="M24 8.25a.5.5 0 0 0-.5-.5H.5a.5.5 0 0 0-.5.5v12a2.5 2.5 0 0 0 2.5 2.5h19a2.5 2.5 0 0 0 2.5-2.5v-12Zm-7.765 5.868a1.221 1.221 0 0 1 0 2.264l-6.626 2.776A1.153 1.153 0 0 1 8 18.123v-5.746a1.151 1.151 0 0 1 1.609-1.035l6.626 2.776ZM19.564 1.677a.25.25 0 0 0-.177-.427H15.6a.106.106 0 0 0-.072.03l-4.54 4.543a.25.25 0 0 0 .177.427h3.783c.027 0 .054-.01.073-.03l4.543-4.543ZM22.071 1.318a.047.047 0 0 0-.045.013l-4.492 4.492a.249.249 0 0 0 .038.385.25.25 0 0 0 .14.042h5.784a.5.5 0 0 0 .5-.5v-2a2.5 2.5 0 0 0-1.925-2.432ZM13.014 1.677a.25.25 0 0 0-.178-.427H9.101a.106.106 0 0 0-.073.03l-4.54 4.543a.25.25 0 0 0 .177.427H8.4a.106.106 0 0 0 .073-.03l4.54-4.543ZM6.513 1.677a.25.25 0 0 0-.177-.427H2.5A2.5 2.5 0 0 0 0 3.75v2a.5.5 0 0 0 .5.5h1.4a.106.106 0 0 0 .073-.03l4.54-4.543Z"
-                                        />
-                                    </g>
-                                </svg>
+                            <div class="flex-1 p-3 sm:p-4">
+                                <div class="h-full rounded-2xl bg-white p-4 sm:p-6 overflow-hidden shadow-inner">
+                                    <div class="flex items-center justify-between mb-6">
+                                        <div class="text-sm font-bold text-gray-900">MyBrand</div>
+                                        <div class="hidden sm:flex gap-4">
+                                            <div class="h-2 w-12 rounded-full bg-gray-200"></div>
+                                            <div class="h-2 w-12 rounded-full bg-gray-200"></div>
+                                            <div class="h-2 w-12 rounded-full bg-gray-200"></div>
+                                        </div>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="mx-auto h-4 w-52 rounded-full bg-gradient-to-r from-indigo-200 via-violet-200 to-purple-200 mb-3 shadow-sm"></div>
+                                        <div class="mx-auto h-2.5 w-64 rounded-full bg-gray-100 mb-2"></div>
+                                        <div class="mx-auto h-2.5 w-52 rounded-full bg-gray-100 mb-7"></div>
+                                        <div class="mx-auto h-10 w-32 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 shadow-lg shadow-indigo-500/20"></div>
+                                    </div>
+                                    <div class="mt-10 grid grid-cols-3 gap-3">
+                                        <div v-for="c in ['indigo', 'violet', 'blue']" :key="c" class="rounded-xl bg-gray-50/80 p-3 border border-gray-100 shadow-sm">
+                                            <div :class="`mb-2 size-8 rounded-lg bg-${c}-100 shadow-inner`"></div>
+                                            <div class="h-2 w-full rounded-full bg-gray-200 mb-1.5"></div>
+                                            <div class="h-1.5 w-3/4 rounded-full bg-gray-100"></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-
-                            <div class="pt-3 sm:pt-5">
-                                <h2
-                                    class="text-xl font-semibold text-black dark:text-white"
-                                >
-                                    Laracasts
-                                </h2>
-
-                                <p class="mt-4 text-sm/relaxed">
-                                    Laracasts offers thousands of video
-                                    tutorials on Laravel, PHP, and JavaScript
-                                    development. Check them out, see for
-                                    yourself, and massively level up your
-                                    development skills in the process.
-                                </p>
-                            </div>
-
-                            <svg
-                                class="size-6 shrink-0 self-center stroke-[#FF2D20]"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke-width="1.5"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-                                />
-                            </svg>
-                        </a>
-
-                        <a
-                            href="https://laravel-news.com"
-                            class="flex items-start gap-4 rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] transition duration-300 hover:text-black/70 hover:ring-black/20 focus:outline-none focus-visible:ring-[#FF2D20] lg:pb-10 dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:text-white/70 dark:hover:ring-zinc-700 dark:focus-visible:ring-[#FF2D20]"
-                        >
-                            <div
-                                class="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#FF2D20]/10 sm:size-16"
-                            >
-                                <svg
-                                    class="size-5 sm:size-6"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <g fill="#FF2D20">
-                                        <path
-                                            d="M8.75 4.5H5.5c-.69 0-1.25.56-1.25 1.25v4.75c0 .69.56 1.25 1.25 1.25h3.25c.69 0 1.25-.56 1.25-1.25V5.75c0-.69-.56-1.25-1.25-1.25Z"
-                                        />
-                                        <path
-                                            d="M24 10a3 3 0 0 0-3-3h-2V2.5a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2V20a3.5 3.5 0 0 0 3.5 3.5h17A3.5 3.5 0 0 0 24 20V10ZM3.5 21.5A1.5 1.5 0 0 1 2 20V3a.5.5 0 0 1 .5-.5h14a.5.5 0 0 1 .5.5v17c0 .295.037.588.11.874a.5.5 0 0 1-.484.625L3.5 21.5ZM22 20a1.5 1.5 0 1 1-3 0V9.5a.5.5 0 0 1 .5-.5H21a1 1 0 0 1 1 1v10Z"
-                                        />
-                                        <path
-                                            d="M12.751 6.047h2a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-.75.75h-2A.75.75 0 0 1 12 7.3v-.5a.75.75 0 0 1 .751-.753ZM12.751 10.047h2a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-.75.75h-2A.75.75 0 0 1 12 11.3v-.5a.75.75 0 0 1 .751-.753ZM4.751 14.047h10a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-.75.75h-10A.75.75 0 0 1 4 15.3v-.5a.75.75 0 0 1 .751-.753ZM4.75 18.047h7.5a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-.75.75h-7.5A.75.75 0 0 1 4 19.3v-.5a.75.75 0 0 1 .75-.753Z"
-                                        />
-                                    </g>
-                                </svg>
-                            </div>
-
-                            <div class="pt-3 sm:pt-5">
-                                <h2
-                                    class="text-xl font-semibold text-black dark:text-white"
-                                >
-                                    Laravel News
-                                </h2>
-
-                                <p class="mt-4 text-sm/relaxed">
-                                    Laravel News is a community driven portal
-                                    and newsletter aggregating all of the latest
-                                    and most important news in the Laravel
-                                    ecosystem, including new package releases
-                                    and tutorials.
-                                </p>
-                            </div>
-
-                            <svg
-                                class="size-6 shrink-0 self-center stroke-[#FF2D20]"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke-width="1.5"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-                                />
-                            </svg>
-                        </a>
-
-                        <div
-                            class="flex items-start gap-4 rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] lg:pb-10 dark:bg-zinc-900 dark:ring-zinc-800"
-                        >
-                            <div
-                                class="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#FF2D20]/10 sm:size-16"
-                            >
-                                <svg
-                                    class="size-5 sm:size-6"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <g fill="#FF2D20">
-                                        <path
-                                            d="M16.597 12.635a.247.247 0 0 0-.08-.237 2.234 2.234 0 0 1-.769-1.68c.001-.195.03-.39.084-.578a.25.25 0 0 0-.09-.267 8.8 8.8 0 0 0-4.826-1.66.25.25 0 0 0-.268.181 2.5 2.5 0 0 1-2.4 1.824.045.045 0 0 0-.045.037 12.255 12.255 0 0 0-.093 3.86.251.251 0 0 0 .208.214c2.22.366 4.367 1.08 6.362 2.118a.252.252 0 0 0 .32-.079 10.09 10.09 0 0 0 1.597-3.733ZM13.616 17.968a.25.25 0 0 0-.063-.407A19.697 19.697 0 0 0 8.91 15.98a.25.25 0 0 0-.287.325c.151.455.334.898.548 1.328.437.827.981 1.594 1.619 2.28a.249.249 0 0 0 .32.044 29.13 29.13 0 0 0 2.506-1.99ZM6.303 14.105a.25.25 0 0 0 .265-.274 13.048 13.048 0 0 1 .205-4.045.062.062 0 0 0-.022-.07 2.5 2.5 0 0 1-.777-.982.25.25 0 0 0-.271-.149 11 11 0 0 0-5.6 2.815.255.255 0 0 0-.075.163c-.008.135-.02.27-.02.406.002.8.084 1.598.246 2.381a.25.25 0 0 0 .303.193 19.924 19.924 0 0 1 5.746-.438ZM9.228 20.914a.25.25 0 0 0 .1-.393 11.53 11.53 0 0 1-1.5-2.22 12.238 12.238 0 0 1-.91-2.465.248.248 0 0 0-.22-.187 18.876 18.876 0 0 0-5.69.33.249.249 0 0 0-.179.336c.838 2.142 2.272 4 4.132 5.353a.254.254 0 0 0 .15.048c1.41-.01 2.807-.282 4.117-.802ZM18.93 12.957l-.005-.008a.25.25 0 0 0-.268-.082 2.21 2.21 0 0 1-.41.081.25.25 0 0 0-.217.2c-.582 2.66-2.127 5.35-5.75 7.843a.248.248 0 0 0-.09.299.25.25 0 0 0 .065.091 28.703 28.703 0 0 0 2.662 2.12.246.246 0 0 0 .209.037c2.579-.701 4.85-2.242 6.456-4.378a.25.25 0 0 0 .048-.189 13.51 13.51 0 0 0-2.7-6.014ZM5.702 7.058a.254.254 0 0 0 .2-.165A2.488 2.488 0 0 1 7.98 5.245a.093.093 0 0 0 .078-.062 19.734 19.734 0 0 1 3.055-4.74.25.25 0 0 0-.21-.41 12.009 12.009 0 0 0-10.4 8.558.25.25 0 0 0 .373.281 12.912 12.912 0 0 1 4.826-1.814ZM10.773 22.052a.25.25 0 0 0-.28-.046c-.758.356-1.55.635-2.365.833a.25.25 0 0 0-.022.48c1.252.43 2.568.65 3.893.65.1 0 .2 0 .3-.008a.25.25 0 0 0 .147-.444c-.526-.424-1.1-.917-1.673-1.465ZM18.744 8.436a.249.249 0 0 0 .15.228 2.246 2.246 0 0 1 1.352 2.054c0 .337-.08.67-.23.972a.25.25 0 0 0 .042.28l.007.009a15.016 15.016 0 0 1 2.52 4.6.25.25 0 0 0 .37.132.25.25 0 0 0 .096-.114c.623-1.464.944-3.039.945-4.63a12.005 12.005 0 0 0-5.78-10.258.25.25 0 0 0-.373.274c.547 2.109.85 4.274.901 6.453ZM9.61 5.38a.25.25 0 0 0 .08.31c.34.24.616.561.8.935a.25.25 0 0 0 .3.127.631.631 0 0 1 .206-.034c2.054.078 4.036.772 5.69 1.991a.251.251 0 0 0 .267.024c.046-.024.093-.047.141-.067a.25.25 0 0 0 .151-.23A29.98 29.98 0 0 0 15.957.764a.25.25 0 0 0-.16-.164 11.924 11.924 0 0 0-2.21-.518.252.252 0 0 0-.215.076A22.456 22.456 0 0 0 9.61 5.38Z"
-                                        />
-                                    </g>
-                                </svg>
-                            </div>
-
-                            <div class="pt-3 sm:pt-5">
-                                <h2
-                                    class="text-xl font-semibold text-black dark:text-white"
-                                >
-                                    Vibrant Ecosystem
-                                </h2>
-
-                                <p class="mt-4 text-sm/relaxed">
-                                    Laravel's robust library of first-party
-                                    tools and libraries, such as
-                                    <a
-                                        href="https://forge.laravel.com"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white dark:focus-visible:ring-[#FF2D20]"
-                                        >Forge</a
-                                    >,
-                                    <a
-                                        href="https://vapor.laravel.com"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                        >Vapor</a
-                                    >,
-                                    <a
-                                        href="https://nova.laravel.com"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                        >Nova</a
-                                    >,
-                                    <a
-                                        href="https://envoyer.io"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                        >Envoyer</a
-                                    >, and
-                                    <a
-                                        href="https://herd.laravel.com"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                        >Herd</a
-                                    >
-                                    help you take your projects to the next
-                                    level. Pair them with powerful open source
-                                    libraries like
-                                    <a
-                                        href="https://laravel.com/docs/billing"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                        >Cashier</a
-                                    >,
-                                    <a
-                                        href="https://laravel.com/docs/dusk"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                        >Dusk</a
-                                    >,
-                                    <a
-                                        href="https://laravel.com/docs/broadcasting"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                        >Echo</a
-                                    >,
-                                    <a
-                                        href="https://laravel.com/docs/horizon"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                        >Horizon</a
-                                    >,
-                                    <a
-                                        href="https://laravel.com/docs/sanctum"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                        >Sanctum</a
-                                    >,
-                                    <a
-                                        href="https://laravel.com/docs/telescope"
-                                        class="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
-                                        >Telescope</a
-                                    >, and more.
-                                </p>
+                            <div class="hidden w-56 border-l border-gray-800/80 p-4 lg:block">
+                                <div class="mb-4 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600">Theme</div>
+                                <div class="space-y-3">
+                                    <div v-for="c in [{bg:'bg-indigo-500 shadow-indigo-500/40', l:'Primary'}, {bg:'bg-violet-500 shadow-violet-500/40', l:'Secondary'}, {bg:'bg-gray-100 ring-1 ring-gray-600', l:'Text'}]" :key="c.l" class="flex items-center gap-3">
+                                        <div :class="`size-7 rounded-lg ${c.bg} shadow-md`"></div>
+                                        <div class="text-xs text-gray-500">{{ c.l }}</div>
+                                    </div>
+                                    <div class="mt-6 mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600">Font</div>
+                                    <div class="rounded-lg bg-white/[0.03] px-3 py-2.5 text-xs text-gray-400 border border-gray-700/40">Inter</div>
+                                    <div class="mt-6 mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600">Radius</div>
+                                    <div class="flex gap-1.5">
+                                        <div class="rounded-md bg-gray-800/50 px-3 py-1.5 text-xs text-gray-500">sm</div>
+                                        <div class="rounded-md bg-violet-500/15 px-3 py-1.5 text-xs text-violet-400 border border-violet-500/20 shadow-sm shadow-violet-500/10">md</div>
+                                        <div class="rounded-md bg-gray-800/50 px-3 py-1.5 text-xs text-gray-500">lg</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </main>
-
-                <footer
-                    class="py-16 text-center text-sm text-black dark:text-white/70"
-                >
-                    Laravel v{{ laravelVersion }} (PHP v{{ phpVersion }})
-                </footer>
+                    <div class="mockup-glow absolute -inset-10 -z-10 rounded-[2rem] bg-gradient-to-r from-indigo-400/8 via-violet-400/8 to-purple-400/8 blur-3xl"></div>
+                    <div class="absolute -bottom-px left-[8%] right-[8%] h-px bg-gradient-to-r from-transparent via-indigo-400/30 to-transparent"></div>
+                </div>
             </div>
-        </div>
+        </section>
+
+        <!-- ===== FEATURES ===== -->
+        <section id="features" class="relative py-28 lg:py-44 overflow-hidden">
+            <div class="section-glow-left"></div>
+            <div class="relative mx-auto max-w-7xl px-6">
+                <div class="text-center animate-on-scroll">
+                    <div class="inline-flex items-center gap-2 rounded-full border border-indigo-200/70 bg-white/90 backdrop-blur-sm px-4 py-1.5 text-sm font-medium text-indigo-600 shadow-lg shadow-indigo-500/[0.04] mb-5">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>
+                        Features
+                    </div>
+                    <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl lg:text-5xl leading-tight">Everything you need to build<br class="hidden sm:block" /> amazing websites</h2>
+                    <p class="mt-5 mx-auto max-w-2xl text-lg text-gray-500">From AI generation to visual editing to one-click publishing — we've got every step covered.</p>
+                </div>
+
+                <div class="mt-20 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    <div v-for="(feature, i) in features" :key="feature.title"
+                        class="animate-on-scroll feature-card group relative rounded-2xl border border-gray-100/80 bg-white/80 backdrop-blur-sm p-8 transition-all duration-500 hover:-translate-y-3"
+                        :style="{ transitionDelay: `${i * 80}ms` }">
+                        <!-- Hover glow -->
+                        <div :class="`absolute -inset-px rounded-2xl bg-gradient-to-br ${featureColors[feature.color].glow} opacity-0 transition-opacity duration-500 group-hover:opacity-100 -z-10 blur-xl`"></div>
+                        <div class="absolute inset-0 rounded-2xl bg-gradient-to-br from-white to-gray-50/50 opacity-0 transition-opacity duration-500 group-hover:opacity-100 border border-gray-200/50"></div>
+                        <div class="relative">
+                            <div :class="`inline-flex size-16 items-center justify-center rounded-2xl ${featureColors[feature.color].bg} ${featureColors[feature.color].text} border ${featureColors[feature.color].border} shadow-lg ${featureColors[feature.color].shadow} transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 group-hover:shadow-xl`" v-html="feature.icon"></div>
+                            <h3 class="mt-6 text-lg font-bold text-gray-900 group-hover:text-gray-800 transition-colors">{{ feature.title }}</h3>
+                            <p class="mt-3 text-gray-500 leading-relaxed text-[0.9rem]">{{ feature.desc }}</p>
+                            <!-- Arrow indicator -->
+                            <div class="mt-5 flex items-center gap-1.5 text-sm font-medium opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0" :class="featureColors[feature.color].text">
+                                Learn more
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== HOW IT WORKS ===== -->
+        <section id="how-it-works" class="relative py-28 lg:py-44 overflow-hidden">
+            <div class="section-glow-right"></div>
+            <div class="mx-auto max-w-7xl px-6">
+                <div class="text-center animate-on-scroll">
+                    <div class="inline-flex items-center gap-2 rounded-full border border-indigo-200/70 bg-white/90 backdrop-blur-sm px-4 py-1.5 text-sm font-medium text-indigo-600 shadow-lg shadow-indigo-500/[0.04] mb-5">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" /></svg>
+                        How It Works
+                    </div>
+                    <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl lg:text-5xl leading-tight">Three steps to your<br class="hidden sm:block" /> dream website</h2>
+                </div>
+
+                <div class="mt-20 grid gap-8 lg:grid-cols-3 lg:gap-6">
+                    <div v-for="(step, i) in steps" :key="step.num"
+                        class="animate-on-scroll group relative text-center"
+                        :style="{ transitionDelay: `${i * 150}ms` }">
+                        <!-- Connector -->
+                        <div v-if="i < steps.length - 1" class="hidden lg:block absolute top-14 left-[60%] w-[80%] h-px">
+                            <div class="h-full bg-gradient-to-r from-indigo-300/50 to-transparent connector-line"></div>
+                            <div class="connector-dot absolute right-0 top-1/2 -translate-y-1/2 size-2 rounded-full bg-indigo-300/50"></div>
+                        </div>
+
+                        <div class="relative mx-auto flex size-28 items-center justify-center">
+                            <!-- Outer ring -->
+                            <div class="absolute inset-0 rounded-[1.75rem] border-2 border-dashed border-indigo-200/40 transition-all duration-700 group-hover:border-indigo-300/70 group-hover:rotate-[30deg] group-hover:scale-110"></div>
+                            <!-- BG glow -->
+                            <div class="absolute inset-2 rounded-3xl bg-gradient-to-br from-indigo-100/60 to-violet-100/60 transition-all duration-500 group-hover:from-indigo-100 group-hover:to-violet-100 group-hover:scale-105 group-hover:shadow-xl group-hover:shadow-indigo-200/30"></div>
+                            <div class="relative flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-500/25 transition-all duration-500 group-hover:scale-110 group-hover:shadow-2xl group-hover:shadow-indigo-500/40 group-hover:-rotate-3" v-html="step.icon"></div>
+                        </div>
+                        <div class="mt-4 text-xs font-bold uppercase tracking-[0.2em] text-indigo-400/80">Step {{ step.num }}</div>
+                        <h3 class="mt-3 text-xl font-bold text-gray-900">{{ step.title }}</h3>
+                        <p class="mt-3 text-gray-500 leading-relaxed max-w-xs mx-auto text-sm">{{ step.desc }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== PRICING ===== -->
+        <section id="pricing" class="relative py-28 lg:py-44 overflow-hidden">
+            <div class="section-glow-center"></div>
+            <div class="relative mx-auto max-w-7xl px-6">
+                <div class="text-center animate-on-scroll">
+                    <div class="inline-flex items-center gap-2 rounded-full border border-indigo-200/70 bg-white/90 backdrop-blur-sm px-4 py-1.5 text-sm font-medium text-indigo-600 shadow-lg shadow-indigo-500/[0.04] mb-5">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>
+                        Pricing
+                    </div>
+                    <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl lg:text-5xl leading-tight">Simple, transparent pricing</h2>
+                    <p class="mt-5 mx-auto max-w-2xl text-lg text-gray-500">Start for free, upgrade as you grow. No hidden fees.</p>
+                </div>
+
+                <div class="mt-20 grid gap-6 lg:grid-cols-3 items-center">
+                    <div v-for="(plan, i) in plans" :key="plan.name"
+                        class="animate-on-scroll group relative"
+                        :style="{ transitionDelay: `${i * 100}ms` }">
+                        <div :class="[
+                            'pricing-card relative rounded-3xl border p-8 lg:p-10 transition-all duration-500',
+                            plan.highlight
+                                ? 'border-indigo-200/80 bg-white shadow-[0_20px_60px_-15px_rgba(99,102,241,0.15)] ring-1 ring-indigo-100 lg:scale-105 hover:-translate-y-2'
+                                : 'border-gray-100 bg-white/80 backdrop-blur-sm shadow-xl shadow-gray-200/30 hover:shadow-2xl hover:shadow-indigo-100/30 hover:-translate-y-2 hover:border-gray-200'
+                        ]">
+                            <div v-if="plan.highlight" class="absolute -top-4 left-1/2 -translate-x-1/2">
+                                <div class="rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-1.5 text-xs font-bold text-white shadow-xl shadow-indigo-500/30 uppercase tracking-wider">Most Popular</div>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900">{{ plan.name }}</h3>
+                            <div class="mt-5 flex items-baseline gap-1">
+                                <span class="text-5xl font-extrabold tracking-tight text-gray-900">{{ plan.price }}</span>
+                                <span class="text-lg text-gray-400 font-medium">{{ plan.period }}</span>
+                            </div>
+                            <div class="mt-6 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
+                            <ul class="mt-6 space-y-4">
+                                <li v-for="(f, fi) in plan.features" :key="f" class="flex items-center gap-3 feature-list-item" :style="{ animationDelay: `${fi * 0.05}s` }">
+                                    <div class="flex size-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-50 to-violet-50 shadow-sm border border-indigo-100/50">
+                                        <svg class="size-3.5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                                    </div>
+                                    <span class="text-sm text-gray-600">{{ f }}</span>
+                                </li>
+                            </ul>
+                            <Link v-if="canRegister" :href="route('register')"
+                                :class="[
+                                    'mt-10 block w-full rounded-2xl py-4 text-center text-sm font-semibold transition-all duration-300',
+                                    plan.highlight
+                                        ? 'btn-3d text-white hover:-translate-y-0.5'
+                                        : 'border border-gray-200 text-gray-700 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50/50 hover:shadow-lg hover:shadow-indigo-100/30'
+                                ]">
+                                {{ plan.cta }}
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== CTA ===== -->
+        <section class="py-28 lg:py-44 animate-on-scroll">
+            <div class="mx-auto max-w-5xl px-6 text-center">
+                <div class="cta-card relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-600 px-8 py-24 sm:px-16">
+                    <!-- Decorative -->
+                    <div class="absolute inset-0 overflow-hidden">
+                        <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 size-[700px] rounded-full bg-white/[0.07] blur-3xl"></div>
+                        <div class="absolute bottom-0 right-0 translate-x-1/4 translate-y-1/4 size-[500px] rounded-full bg-purple-400/10 blur-3xl"></div>
+                        <div class="absolute inset-0 bg-[linear-gradient(to_right,#ffffff06_1px,transparent_1px),linear-gradient(to_bottom,#ffffff06_1px,transparent_1px)] bg-[size:3rem_3rem]"></div>
+                        <!-- Floating rings -->
+                        <div class="cta-ring absolute top-10 left-10 size-20 rounded-full border border-white/10"></div>
+                        <div class="cta-ring-2 absolute bottom-10 right-16 size-32 rounded-full border border-white/[0.06]"></div>
+                    </div>
+                    <div class="relative">
+                        <h2 class="text-3xl font-bold text-white sm:text-4xl lg:text-5xl leading-tight drop-shadow-lg">Ready to build your<br /> dream website?</h2>
+                        <p class="mt-6 text-lg text-indigo-100/90 max-w-2xl mx-auto">Join thousands of creators building beautiful websites with AI. Start free, no credit card required.</p>
+                        <div class="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+                            <Link v-if="canRegister" :href="route('register')" class="group inline-flex items-center gap-2 rounded-2xl bg-white px-9 py-4.5 text-base font-semibold text-indigo-600 shadow-2xl shadow-black/10 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_25px_60px_-12px_rgba(0,0,0,0.2)]">
+                                Get Started Free
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="size-5 transition-transform duration-300 group-hover:translate-x-1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+                            </Link>
+                            <a href="/demo" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 backdrop-blur px-9 py-4.5 text-base font-semibold text-white transition-all duration-300 hover:bg-white/20 hover:-translate-y-0.5">View Demo</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== FOOTER ===== -->
+        <footer class="border-t border-gray-100 bg-gradient-to-b from-gray-50/50 to-white py-16">
+            <div class="mx-auto max-w-7xl px-6">
+                <div class="flex flex-col items-center gap-8">
+                    <Link href="/" class="flex items-center gap-2.5 group">
+                        <div class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 shadow-xl shadow-indigo-500/25 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="white" class="size-5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" /></svg>
+                        </div>
+                        <span class="text-lg font-bold">Ai<span class="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">Web</span>Builder</span>
+                    </Link>
+                    <div class="flex flex-wrap justify-center gap-8">
+                        <button @click="scrollTo('features')" class="text-sm text-gray-500 transition hover:text-indigo-600">Features</button>
+                        <button @click="scrollTo('how-it-works')" class="text-sm text-gray-500 transition hover:text-indigo-600">How It Works</button>
+                        <button @click="scrollTo('pricing')" class="text-sm text-gray-500 transition hover:text-indigo-600">Pricing</button>
+                        <a href="/demo" target="_blank" rel="noopener" class="text-sm text-gray-500 transition hover:text-indigo-600">Demo</a>
+                    </div>
+                    <div class="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
+                    <p class="text-sm text-gray-400">&copy; 2026 AiWebBuilder. All rights reserved.</p>
+                </div>
+            </div>
+        </footer>
     </div>
 </template>
+
+<style scoped>
+/* ============================================
+   3D BUTTONS
+   ============================================ */
+.btn-3d {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    box-shadow:
+        0 1px 2px rgba(79,70,229,0.3),
+        0 4px 8px rgba(79,70,229,0.2),
+        0 8px 20px rgba(79,70,229,0.15),
+        inset 0 1px 0 rgba(255,255,255,0.15);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.btn-3d:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 2px 4px rgba(79,70,229,0.3),
+        0 8px 16px rgba(79,70,229,0.25),
+        0 16px 40px rgba(79,70,229,0.2),
+        inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.btn-3d-hero {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #6d28d9 100%);
+    box-shadow:
+        0 2px 4px rgba(79,70,229,0.3),
+        0 8px 20px rgba(79,70,229,0.25),
+        0 16px 50px rgba(79,70,229,0.2),
+        inset 0 2px 0 rgba(255,255,255,0.1),
+        inset 0 -2px 0 rgba(0,0,0,0.1);
+}
+.btn-3d-hero:hover {
+    box-shadow:
+        0 4px 8px rgba(79,70,229,0.3),
+        0 12px 30px rgba(79,70,229,0.3),
+        0 24px 60px rgba(79,70,229,0.2),
+        inset 0 2px 0 rgba(255,255,255,0.15),
+        inset 0 -2px 0 rgba(0,0,0,0.1);
+}
+
+/* ============================================
+   3D LOGO
+   ============================================ */
+.logo-3d {
+    box-shadow:
+        0 2px 4px rgba(79,70,229,0.3),
+        0 6px 16px rgba(79,70,229,0.2),
+        inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+/* ============================================
+   3D MOCKUP
+   ============================================ */
+.mockup-3d {
+    box-shadow:
+        0 4px 8px rgba(0,0,0,0.1),
+        0 16px 40px rgba(0,0,0,0.15),
+        0 40px 80px rgba(99,102,241,0.08),
+        0 60px 120px rgba(0,0,0,0.1);
+}
+
+/* ============================================
+   FEATURE CARDS 3D
+   ============================================ */
+.feature-card {
+    box-shadow:
+        0 1px 3px rgba(0,0,0,0.04),
+        0 4px 12px rgba(0,0,0,0.03);
+}
+.feature-card:hover {
+    box-shadow:
+        0 4px 8px rgba(99,102,241,0.06),
+        0 12px 30px rgba(99,102,241,0.08),
+        0 30px 60px rgba(99,102,241,0.04);
+}
+
+/* ============================================
+   STAT CARDS
+   ============================================ */
+.stat-card {
+    box-shadow:
+        0 2px 8px rgba(0,0,0,0.04),
+        0 8px 24px rgba(99,102,241,0.04);
+    animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stat-card:hover {
+    box-shadow:
+        0 4px 12px rgba(99,102,241,0.08),
+        0 16px 40px rgba(99,102,241,0.06);
+}
+
+/* ============================================
+   PRICING CARDS
+   ============================================ */
+.pricing-card {
+    box-shadow:
+        0 2px 8px rgba(0,0,0,0.04),
+        0 8px 30px rgba(0,0,0,0.04);
+}
+
+/* ============================================
+   CTA CARD
+   ============================================ */
+.cta-card {
+    box-shadow:
+        0 8px 20px rgba(79,70,229,0.15),
+        0 25px 60px rgba(79,70,229,0.15),
+        0 50px 100px rgba(79,70,229,0.1);
+}
+
+/* ============================================
+   CTA RINGS
+   ============================================ */
+.cta-ring {
+    animation: ringFloat 8s ease-in-out infinite;
+}
+.cta-ring-2 {
+    animation: ringFloat 12s ease-in-out infinite reverse;
+}
+@keyframes ringFloat {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    50% { transform: translate(15px, -20px) rotate(90deg); }
+}
+
+/* ============================================
+   TYPING CURSOR
+   ============================================ */
+.typing-cursor {
+    animation: blink 0.8s step-end infinite;
+    color: #6366f1;
+    font-weight: 300;
+}
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* ============================================
+   ANIMATED BG ORBS
+   ============================================ */
+.orb { position: absolute; border-radius: 50%; filter: blur(80px); will-change: transform; opacity: 0.5; }
+.orb-1 { width: 800px; height: 800px; background: radial-gradient(circle, rgba(129,140,248,0.2) 0%, transparent 70%); top: -15%; left: 10%; animation: orbFloat1 22s ease-in-out infinite; }
+.orb-2 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(167,139,250,0.18) 0%, transparent 70%); top: 20%; right: -10%; animation: orbFloat2 28s ease-in-out infinite; }
+.orb-3 { width: 550px; height: 550px; background: radial-gradient(circle, rgba(244,114,182,0.12) 0%, transparent 70%); bottom: 25%; left: -8%; animation: orbFloat3 24s ease-in-out infinite; }
+.orb-4 { width: 450px; height: 450px; background: radial-gradient(circle, rgba(96,165,250,0.15) 0%, transparent 70%); top: 50%; left: 40%; animation: orbFloat4 20s ease-in-out infinite; }
+.orb-5 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(192,132,252,0.12) 0%, transparent 70%); bottom: -12%; right: 10%; animation: orbFloat5 30s ease-in-out infinite; }
+
+@keyframes orbFloat1 { 0%,100%{transform:translate(0,0) scale(1)} 25%{transform:translate(120px,90px) scale(1.1)} 50%{transform:translate(-70px,160px) scale(.95)} 75%{transform:translate(90px,-50px) scale(1.05)} }
+@keyframes orbFloat2 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(-100px,110px) scale(1.08)} 66%{transform:translate(70px,-90px) scale(.92)} }
+@keyframes orbFloat3 { 0%,100%{transform:translate(0,0) scale(1)} 25%{transform:translate(80px,-70px) scale(1.12)} 50%{transform:translate(-50px,-110px) scale(.9)} 75%{transform:translate(-70px,60px) scale(1.05)} }
+@keyframes orbFloat4 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-140px,70px) scale(1.15)} }
+@keyframes orbFloat5 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(90px,-100px) scale(1.1)} 66%{transform:translate(-110px,50px) scale(.95)} }
+
+/* ============================================
+   DOT GRID
+   ============================================ */
+.dot-grid {
+    background-image: radial-gradient(circle, rgba(99,102,241,0.06) 1px, transparent 1px);
+    background-size: 36px 36px;
+    animation: dotDrift 50s linear infinite;
+}
+@keyframes dotDrift { 0%{background-position:0 0} 100%{background-position:36px 36px} }
+
+/* ============================================
+   AURORA
+   ============================================ */
+.aurora { position: absolute; filter: blur(70px); will-change: transform; }
+.aurora-1 {
+    top: 15%; left: -15%; width: 130%; height: 250px;
+    background: linear-gradient(90deg, transparent, rgba(129,140,248,0.06) 15%, rgba(167,139,250,0.08) 35%, rgba(244,114,182,0.04) 55%, rgba(96,165,250,0.06) 75%, transparent);
+    transform: rotate(-6deg);
+    animation: auroraDrift1 18s ease-in-out infinite;
+}
+.aurora-2 {
+    bottom: 25%; left: -10%; width: 120%; height: 200px;
+    background: linear-gradient(90deg, transparent, rgba(96,165,250,0.05) 20%, rgba(192,132,252,0.06) 50%, rgba(129,140,248,0.04) 80%, transparent);
+    transform: rotate(4deg);
+    animation: auroraDrift2 22s ease-in-out infinite;
+}
+@keyframes auroraDrift1 { 0%,100%{transform:rotate(-6deg) translateX(0);opacity:.5} 50%{transform:rotate(-3deg) translateX(100px);opacity:.9} }
+@keyframes auroraDrift2 { 0%,100%{transform:rotate(4deg) translateX(0);opacity:.4} 50%{transform:rotate(2deg) translateX(-80px);opacity:.8} }
+
+/* ============================================
+   PARTICLES
+   ============================================ */
+.particle { position: absolute; border-radius: 50%; pointer-events: none; }
+.particle-1  { width:5px; height:5px; background:rgba(129,140,248,0.5); top:12%; left:8%;   animation: pF 10s ease-in-out infinite, pO 10s ease-in-out infinite; }
+.particle-2  { width:4px; height:4px; background:rgba(167,139,250,0.4); top:30%; right:15%;  animation: pF 12s ease-in-out infinite 1s, pO 12s ease-in-out infinite 1s; }
+.particle-3  { width:6px; height:6px; background:rgba(244,114,182,0.35);top:50%; left:6%;   animation: pF 14s ease-in-out infinite 2s, pO 14s ease-in-out infinite 2s; }
+.particle-4  { width:3px; height:3px; background:rgba(96,165,250,0.5);  top:20%; right:6%;  animation: pF 11s ease-in-out infinite 3s, pO 11s ease-in-out infinite 3s; }
+.particle-5  { width:5px; height:5px; background:rgba(192,132,252,0.35);top:60%; right:22%; animation: pF 13s ease-in-out infinite 4s, pO 13s ease-in-out infinite 4s; }
+.particle-6  { width:4px; height:4px; background:rgba(129,140,248,0.4); top:40%; left:25%;  animation: pF 9s ease-in-out infinite 2.5s, pO 9s ease-in-out infinite 2.5s; }
+.particle-7  { width:3px; height:3px; background:rgba(244,114,182,0.4); top:10%; left:50%;  animation: pF 15s ease-in-out infinite 1.5s, pO 15s ease-in-out infinite 1.5s; }
+.particle-8  { width:5px; height:5px; background:rgba(96,165,250,0.35); top:70%; left:60%;  animation: pF 11s ease-in-out infinite 3.5s, pO 11s ease-in-out infinite 3.5s; }
+.particle-9  { width:4px; height:4px; background:rgba(167,139,250,0.4); top:80%; left:15%;  animation: pF 10s ease-in-out infinite 5s, pO 10s ease-in-out infinite 5s; }
+.particle-10 { width:6px; height:6px; background:rgba(129,140,248,0.3); top:85%; right:10%; animation: pF 16s ease-in-out infinite 2s, pO 16s ease-in-out infinite 2s; }
+.particle-11 { width:3px; height:3px; background:rgba(192,132,252,0.45);top:5%;  left:35%;  animation: pF 8s ease-in-out infinite 1s, pO 8s ease-in-out infinite 1s; }
+.particle-12 { width:4px; height:4px; background:rgba(244,114,182,0.35);top:45%; right:35%; animation: pF 13s ease-in-out infinite 4.5s, pO 13s ease-in-out infinite 4.5s; }
+
+@keyframes pF { 0%,100%{transform:translate(0,0)} 25%{transform:translate(30px,-60px)} 50%{transform:translate(-20px,-120px)} 75%{transform:translate(40px,-60px)} }
+@keyframes pO { 0%,100%{opacity:0} 12%,88%{opacity:1} }
+
+/* ============================================
+   SECTION GLOWS
+   ============================================ */
+.section-glow-left { position:absolute; width:600px; height:600px; left:-300px; top:50%; transform:translateY(-50%); background:radial-gradient(circle,rgba(129,140,248,0.06) 0%,transparent 70%); filter:blur(60px); animation:sG 9s ease-in-out infinite; }
+.section-glow-right { position:absolute; width:600px; height:600px; right:-300px; top:50%; transform:translateY(-50%); background:radial-gradient(circle,rgba(167,139,250,0.06) 0%,transparent 70%); filter:blur(60px); animation:sG 11s ease-in-out infinite; }
+.section-glow-center { position:absolute; width:700px; height:700px; left:50%; top:50%; transform:translate(-50%,-50%); background:radial-gradient(circle,rgba(192,132,252,0.05) 0%,transparent 70%); filter:blur(80px); animation:sGC 13s ease-in-out infinite; }
+@keyframes sG { 0%,100%{opacity:.4;transform:translateY(-50%) scale(1)} 50%{opacity:.8;transform:translateY(-50%) scale(1.2)} }
+@keyframes sGC { 0%,100%{opacity:.3;transform:translate(-50%,-50%) scale(1)} 50%{opacity:.7;transform:translate(-50%,-50%) scale(1.2)} }
+
+/* ============================================
+   CONNECTOR
+   ============================================ */
+.connector-line { animation: cP 3s ease-in-out infinite; }
+.connector-dot { animation: cP 3s ease-in-out infinite 0.5s; }
+@keyframes cP { 0%,100%{opacity:.2} 50%{opacity:.7} }
+
+/* ============================================
+   SCROLL ANIMATIONS
+   ============================================ */
+.animate-on-scroll { opacity:0; transform:translateY(50px) scale(0.97); transition: opacity 1s cubic-bezier(0.16,1,0.3,1), transform 1s cubic-bezier(0.16,1,0.3,1); }
+.animate-visible { opacity:1; transform:translateY(0) scale(1); }
+
+/* ============================================
+   HERO ENTRANCE
+   ============================================ */
+.hero-badge { animation: fadeInUp .8s cubic-bezier(.16,1,.3,1) .1s both; }
+.hero-title { animation: heroReveal 1s cubic-bezier(.16,1,.3,1) .25s both; }
+.hero-subtitle { animation: fadeInUp .8s cubic-bezier(.16,1,.3,1) .45s both; }
+.hero-buttons { animation: fadeInUp .8s cubic-bezier(.16,1,.3,1) .6s both; }
+.hero-stats { animation: fadeInUp .8s cubic-bezier(.16,1,.3,1) .75s both; }
+.hero-mockup { animation: mockupReveal 1.4s cubic-bezier(.16,1,.3,1) .95s both; transition: transform .2s ease-out; }
+
+@keyframes fadeInUp { from{opacity:0;transform:translateY(50px)} to{opacity:1;transform:translateY(0)} }
+@keyframes heroReveal { from{opacity:0;transform:translateY(60px) scale(0.95);filter:blur(8px)} to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)} }
+@keyframes mockupReveal { from{opacity:0;transform:translateY(80px) scale(0.92) perspective(1400px) rotateX(5deg)} to{opacity:1;transform:translateY(0) scale(1) perspective(1400px) rotateX(0)} }
+
+/* ============================================
+   GRADIENT SHIMMER
+   ============================================ */
+.hero-gradient-text { background-size:200% auto; animation:gS 5s ease-in-out infinite; }
+@keyframes gS { 0%,100%{background-position:0% center} 50%{background-position:100% center} }
+
+/* ============================================
+   BUTTON SHINE
+   ============================================ */
+.btn-shine::after { content:''; position:absolute; top:0; left:-100%; width:50%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent); animation:bS 4s ease-in-out infinite; }
+@keyframes bS { 0%,70%,100%{left:-100%} 40%{left:150%} }
+
+/* ============================================
+   MOCKUP GLOW
+   ============================================ */
+.mockup-glow { animation:mG 5s ease-in-out infinite; }
+@keyframes mG { 0%,100%{opacity:.3} 50%{opacity:.6} }
+
+.mockup-block-active { animation:bP 2.5s ease-in-out infinite; }
+@keyframes bP { 0%,100%{border-color:rgba(139,92,246,.2)} 50%{border-color:rgba(139,92,246,.5)} }
+
+/* ============================================
+   NAV LINK
+   ============================================ */
+.nav-link { position:relative; }
+.nav-link::after { content:''; position:absolute; bottom:-4px; left:0; width:0; height:2px; background:linear-gradient(to right,#6366f1,#a78bfa); border-radius:1px; transition:width .3s ease; }
+.nav-link:hover::after { width:100%; }
+</style>
