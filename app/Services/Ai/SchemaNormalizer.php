@@ -182,6 +182,10 @@ final class SchemaNormalizer
         if ($type === 'navbar') {
             $props = $this->rescueLogo($props);
         }
+        if (isset($props['animation'])) {
+            // Accept older/natural names ("slide-left", "zoom-in", "Fade Up").
+            $props['animation'] = BlockCatalog::canonicalAnimation($props['animation']) ?? $props['animation'];
+        }
         $clean = [];
 
         foreach (BlockCatalog::props($type) as $key => $spec) {
@@ -189,6 +193,19 @@ final class SchemaNormalizer
             if ($value !== null) {
                 $clean[$key] = $value;
             }
+        }
+
+        // AI-designed motion (data only, clamped).
+        if ($effect = MotionSpec::effect($props['bgEffect'] ?? null)) {
+            $clean['bgEffect'] = $effect;
+        }
+        if ($phrases = MotionSpec::phrases($props['typingPhrases'] ?? null)) {
+            $clean['typingPhrases'] = $phrases;
+        }
+        if ($custom = MotionSpec::entrance($props['customAnimation'] ?? null)) {
+            $clean['customAnimation'] = $custom;
+        } elseif (($clean['animation'] ?? null) === 'custom') {
+            $clean['animation'] = 'fade-up'; // "custom" without a recipe
         }
 
         $clean = $this->sectionRules($type, $clean);

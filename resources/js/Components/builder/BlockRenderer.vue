@@ -1,5 +1,8 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { replayRequest, canonicalAnimation } from './animPreview';
+import '@/site/animRuntime.js';
+import '../../../css/site-animations.css';
 import BlockNavbar from './blocks/BlockNavbar.vue';
 import BlockHero from './blocks/BlockHero.vue';
 import BlockFeatures from './blocks/BlockFeatures.vue';
@@ -45,6 +48,78 @@ const emit = defineEmits(['update:props', 'select']);
 const component = computed(() => blockMap[props.block.type]);
 const label = computed(() => BLOCK_TYPES[props.block.type]?.label || props.block.type);
 
+/* ---------- Animation & hover — same runtime + CSS as the published site ---------- */
+const animEl = ref(null);
+const anim = computed(() => {
+    const a = canonicalAnimation(props.block.props?.animation);
+    return a && a !== 'none' ? a : null;
+});
+const animSpeed = computed(() => (['fast', 'slow'].includes(props.block.props?.animationSpeed) ? props.block.props.animationSpeed : undefined));
+const animStagger = computed(() => !!props.block.props?.animationStagger);
+const customJson = computed(() => (anim.value === 'custom' && props.block.props?.customAnimation ? JSON.stringify(props.block.props.customAnimation) : undefined));
+const fxJson = computed(() => (props.block.props?.bgEffect?.kind ? JSON.stringify(props.block.props.bgEffect) : undefined));
+const TEXT_FX = ['typing', 'typing-loop', 'words', 'letters', 'gradient', 'highlight'];
+const textFx = computed(() => (TEXT_FX.includes(props.block.props?.textEffect) ? props.block.props.textEffect : undefined));
+const textSpeed = computed(() => (textFx.value && ['fast', 'slow'].includes(props.block.props?.textSpeed) ? props.block.props.textSpeed : undefined));
+const textPhrases = computed(() => (textFx.value === 'typing-loop' && props.block.props?.typingPhrases?.length ? JSON.stringify(props.block.props.typingPhrases) : undefined));
+const buttonFx = computed(() => (['pulse', 'shine', 'glow', 'bounce', 'wiggle', 'pop'].includes(props.block.props?.buttonEffect) ? props.block.props.buttonEffect : undefined));
+const hover = computed(() => (['lift', 'zoom', 'glow'].includes(props.block.props?.hoverEffect) ? props.block.props.hoverEffect : undefined));
+
+async function play() {
+    await nextTick(); // attributes and content must be in the DOM first
+    if (!animEl.value || !window.SiteAnim) return;
+    if (anim.value) window.SiteAnim.play(animEl.value);
+    else window.SiteAnim.reset(animEl.value);
+}
+
+async function mountFx() {
+    await nextTick();
+    if (!animEl.value || !window.SiteAnim) return;
+    if (fxJson.value) window.SiteAnim.mountFx(animEl.value);
+    else window.SiteAnim.unmountFx(animEl.value);
+}
+
+/** Editor preview: plays once, then hands the heading's own nodes back to Vue. */
+async function playText() {
+    await nextTick();
+    if (!animEl.value || !window.SiteAnim) return;
+    if (textFx.value) window.SiteAnim.textFx(animEl.value, true);
+    else window.SiteAnim.stopText(animEl.value);
+}
+
+async function markButtons() {
+    await nextTick();
+    if (animEl.value && window.SiteAnim) window.SiteAnim.markButtons(animEl.value);
+}
+
+onMounted(() => {
+    if (textFx.value) playText();
+    if (buttonFx.value) markButtons();
+    if (fxJson.value) mountFx();
+    if (anim.value) play();
+});
+onBeforeUnmount(() => {
+    if (!animEl.value || !window.SiteAnim) return;
+    window.SiteAnim.reset(animEl.value);
+    window.SiteAnim.unmountFx(animEl.value);
+    window.SiteAnim.stopText(animEl.value);
+});
+watch([textFx, textSpeed, textPhrases], playText);
+// Shimmer is a lasting style (not a one-off preview): put it back after the heading is edited.
+watch(() => textFx.value === 'gradient' && props.block.props?.heading, (v) => v !== false && playText());
+watch([anim, animSpeed, animStagger, customJson], play);
+watch(fxJson, mountFx);
+watch(buttonFx, markButtons);
+// Buttons can be added, restyled or recoloured while editing — re-mark them.
+watch(() => buttonFx.value && JSON.stringify(props.block.props), (v) => v && markButtons());
+// The effect layer lives inside the section's root element — re-attach if a re-render replaced it.
+watch(() => props.block.props, () => fxJson.value && animEl.value?._fxLayer && !animEl.value._fxLayer.isConnected && mountFx(), { deep: true });
+watch(replayRequest, (r) => {
+    if (r.id !== props.block.id) return;
+    play();
+    if (textFx.value) playText();
+});
+
 const sectionStyle = computed(() => {
     const bg = props.block.props?.sectionBg;
     const text = props.block.props?.sectionText;
@@ -66,18 +141,33 @@ const sectionStyle = computed(() => {
 <template>
     <div
         :data-block-id="editable ? block.id : undefined"
-        :class="['relative', editable && 'group/block cursor-pointer']"
+        :class="['anim-on relative', editable && 'group/block cursor-pointer']"
         :style="sectionStyle"
         @click.stop="editable && emit('select', block.id)"
     >
-        <component
+        <div
             v-if="component"
-            :is="component"
-            v-bind="block.props"
-            :editable="editable"
-            :id="block.id"
-            @update:props="(patch) => emit('update:props', block.id, patch)"
-        />
+            ref="animEl"
+            :data-anim="anim || undefined"
+            :data-anim-speed="anim ? animSpeed : undefined"
+            :data-anim-stagger="anim && animStagger ? '' : undefined"
+            :data-anim-whole="anim && block.type === 'navbar' ? '' : undefined"
+            :data-anim-custom="customJson"
+            :data-fx="fxJson"
+            :data-hover="hover"
+            :data-btn-fx="buttonFx"
+            :data-text-fx="textFx"
+            :data-text-speed="textSpeed"
+            :data-text-phrases="textPhrases"
+        >
+            <component
+                :is="component"
+                v-bind="block.props"
+                :editable="editable"
+                :id="block.id"
+                @update:props="(patch) => emit('update:props', block.id, patch)"
+            />
+        </div>
         <div v-else class="p-8 text-center text-red-500 bg-red-50">
             Unknown block type: {{ block.type }}
         </div>

@@ -6,6 +6,7 @@ use App\Models\AiGeneration;
 use App\Models\User;
 use App\Services\Ai\AiException;
 use App\Services\Ai\BlockCatalog;
+use App\Services\Ai\MotionSpec;
 use App\Services\Ai\Prompts;
 use App\Services\Ai\SchemaNormalizer;
 use App\Services\Logo\LogoDesigner;
@@ -108,10 +109,11 @@ class AiWebsiteService
         $summary = $this->summary($data['summary'] ?? null);
         unset($data['summary']);
 
-        return [
-            'schema' => $this->finalizeSite($data, ensureFrame: false, hint: $currentSchema['meta']['title'] ?? ''),
-            'summary' => $summary,
-        ];
+        $schema = $this->finalizeSite($data, ensureFrame: false, hint: $currentSchema['meta']['title'] ?? '');
+        $originals = collect($currentSchema['sections'] ?? [])->keyBy('id');
+        $schema['sections'] = array_map(fn ($s) => $this->keepMotion($s, $originals[$s['id']] ?? null), $schema['sections']);
+
+        return ['schema' => $schema, 'summary' => $summary];
     }
 
     /**
@@ -144,11 +146,212 @@ class AiWebsiteService
             $theme,
         );
         $updated['id'] = $section['id'] ?? $updated['id'];
+        $updated = $this->keepMotion($updated, $section);
 
         // Resolve new photos without repeating ones already in this section.
         $updated = $this->imageResolver->resolvePlaceholders(['sections' => [$updated]], $type)['sections'][0];
 
         return ['section' => $updated, 'summary' => $this->summary($result['data']['summary'] ?? null)];
+    }
+
+    /**
+     * Animation-only edit: a small, fast request that can only touch animation and hover
+     * settings, so it can never change the site's text, images or layout.
+     * Returns handled=false when the request also asks for other changes (caller falls back
+     * to a normal edit).
+     *
+     * @param array $sections [{id, type, props}]
+     * @return array{handled: bool, summary: string, changes: array<int, array{id: string, props: array}>}
+     */
+    public function animate(array $sections, string $instruction, ?string $selectedId = null, ?int $userId = null, bool $extract = false, array $theme = []): array
+    {
+        $ids = [];
+        $page = [];
+        foreach ($sections as $s) {
+            if (!is_array($s) || !isset($s['id'], $s['type']) || !BlockCatalog::has((string) $s['type'])) {
+                continue;
+            }
+            $p = is_array($s['props'] ?? null) ? $s['props'] : [];
+            $ids[(string) $s['id']] = (string) $s['type'];
+            $page[] = [
+                'id' => (string) $s['id'],
+                'type' => (string) $s['type'],
+                'title' => mb_substr((string) ($p['heading'] ?? $p['headline'] ?? $p['brand'] ?? $p['text'] ?? ''), 0, 60),
+                'animation' => BlockCatalog::canonicalAnimation($p['animation'] ?? null) ?? 'none',
+                'animationSpeed' => $p['animationSpeed'] ?? 'normal',
+                'animationStagger' => (bool) ($p['animationStagger'] ?? false),
+                'hoverEffect' => $p['hoverEffect'] ?? 'none',
+                'buttonEffect' => $p['buttonEffect'] ?? 'none',
+                'textEffect' => $p['textEffect'] ?? 'none',
+                'textSpeed' => $p['textSpeed'] ?? 'normal',
+                'typingPhrases' => MotionSpec::phrases($p['typingPhrases'] ?? null),
+                'customAnimation' => ($p['animation'] ?? null) === 'custom' ? MotionSpec::entrance($p['customAnimation'] ?? null) : null,
+                'bgEffect' => MotionSpec::effect($p['bgEffect'] ?? null),
+                'sectionBg' => $p['sectionBg'] ?? null,
+            ];
+        }
+        if (!$page) {
+            throw new AiException('Add a section first, then ask for animations.', 422);
+        }
+
+        $nullable = fn (array $values) => ['type' => ['string', 'null'], 'enum' => [...$values, null]];
+        $schema = [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => ['handled', 'summary', 'sections'],
+            'properties' => [
+                'handled' => ['type' => 'boolean'],
+                'summary' => ['type' => 'string'],
+                'sections' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'required' => ['id', 'animation', 'animationSpeed', 'animationStagger', 'hoverEffect', 'buttonEffect', 'textEffect', 'textSpeed', 'typingPhrases', 'customAnimation', 'bgEffect'],
+                        'properties' => [
+                            'id' => ['type' => 'string', 'enum' => array_keys($ids)],
+                            'animation' => $nullable(BlockCatalog::ANIMATIONS),
+                            'animationSpeed' => $nullable(['fast', 'normal', 'slow']),
+                            'animationStagger' => ['type' => ['boolean', 'null']],
+                            'hoverEffect' => $nullable(BlockCatalog::HOVER_EFFECTS),
+                            'buttonEffect' => $nullable(BlockCatalog::BUTTON_EFFECTS),
+                            'textEffect' => $nullable(BlockCatalog::TEXT_EFFECTS),
+                            'textSpeed' => $nullable(['fast', 'normal', 'slow']),
+                            'typingPhrases' => [
+                                'type' => ['array', 'null'],
+                                'items' => ['type' => 'string'],
+                                'description' => 'Only for typing-loop: 2–4 alternative headings typed after the real one, in the site\'s language',
+                            ],
+                            'customAnimation' => [
+                                'description' => 'Only with animation "custom": the starting pose the content animates FROM into its normal place',
+                                'anyOf' => [['type' => 'null'], [
+                                    'type' => 'object',
+                                    'additionalProperties' => false,
+                                    'required' => ['name', 'opacity', 'x', 'y', 'scale', 'rotate', 'rotateX', 'rotateY', 'skewX', 'blur', 'easing'],
+                                    'properties' => [
+                                        'name' => ['type' => 'string', 'description' => '2–4 word name, e.g. "Bouncy spin-in"'],
+                                        'opacity' => ['type' => 'number', 'description' => 'start opacity 0–1 (usually 0)'],
+                                        'x' => ['type' => 'number', 'description' => 'start offset px, -400..400 (negative = from the left)'],
+                                        'y' => ['type' => 'number', 'description' => 'start offset px, -400..400 (positive = from below)'],
+                                        'scale' => ['type' => 'number', 'description' => 'start scale 0.1–3 (1 = normal)'],
+                                        'rotate' => ['type' => 'number', 'description' => 'start rotation deg -720..720'],
+                                        'rotateX' => ['type' => 'number', 'description' => '3D tilt deg -180..180'],
+                                        'rotateY' => ['type' => 'number', 'description' => '3D turn deg -180..180'],
+                                        'skewX' => ['type' => 'number', 'description' => 'skew deg -45..45'],
+                                        'blur' => ['type' => 'number', 'description' => 'start blur px 0–30'],
+                                        'easing' => ['type' => 'string', 'enum' => MotionSpec::EASINGS],
+                                    ],
+                                ]],
+                            ],
+                            'bgEffect' => [
+                                'description' => 'Background effect for this section. null = keep as is; kind "none" = remove',
+                                'anyOf' => [['type' => 'null'], [
+                                    'type' => 'object',
+                                    'additionalProperties' => false,
+                                    'required' => ['kind', 'name', 'shape', 'emoji', 'colors', 'count', 'sizeMin', 'sizeMax', 'motion', 'speed', 'opacity', 'glow'],
+                                    'properties' => [
+                                        'kind' => ['type' => 'string', 'enum' => [...MotionSpec::KINDS, 'none']],
+                                        'name' => ['type' => 'string', 'description' => '2–4 word name, e.g. "Twinkling gold stars"'],
+                                        'shape' => ['type' => 'string', 'enum' => MotionSpec::SHAPES],
+                                        'emoji' => ['type' => ['string', 'null'], 'description' => 'one emoji, only when shape is "emoji"'],
+                                        'colors' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => '1–4 hex colours'],
+                                        'count' => ['type' => 'integer', 'description' => 'particles 3–120'],
+                                        'sizeMin' => ['type' => 'number', 'description' => 'px'],
+                                        'sizeMax' => ['type' => 'number', 'description' => 'px'],
+                                        'motion' => ['type' => 'string', 'enum' => MotionSpec::MOTIONS],
+                                        'speed' => ['type' => 'string', 'enum' => MotionSpec::SPEEDS],
+                                        'opacity' => ['type' => 'integer', 'description' => '5–100'],
+                                        'glow' => ['type' => 'boolean'],
+                                    ],
+                                ]],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $model = config('ai.models.edit');
+        $result = $this->requestJson(
+            model: $model,
+            messages: [
+                ['role' => 'system', 'content' => Prompts::animate()],
+                ['role' => 'user', 'content' => ($extract ? "MODE: extract — the other parts of this request were already handled. Apply ONLY its motion/effect parts and set handled true (no sections if there are none).\n\n" : '')
+                    . 'Selected section: ' . ($selectedId && isset($ids[$selectedId]) ? "{$selectedId} ({$ids[$selectedId]})" : 'none')
+                    . "\n\nSite colours: " . json_encode(array_intersect_key($theme, array_flip(['primaryColor', 'secondaryColor', 'backgroundColor', 'textColor', 'mode'])), JSON_UNESCAPED_SLASHES)
+                    . "\n\nSections:\n" . json_encode($page, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                    . "\n\nRequest: {$instruction}"],
+            ],
+            schemaName: 'animation_edit',
+            schema: $schema,
+            maxTokens: 4000,
+            temperature: 0.3,
+        );
+        if ($userId) {
+            $this->recordUsage($userId, null, "[animate] {$instruction}", $model, $result['usage']);
+        }
+
+        $data = $result['data'];
+        if (empty($data['handled']) && !$extract) {
+            return ['handled' => false, 'summary' => '', 'changes' => []];
+        }
+
+        $changes = [];
+        foreach ($data['sections'] ?? [] as $row) {
+            $id = (string) ($row['id'] ?? '');
+            if (!isset($ids[$id])) {
+                continue;
+            }
+            $props = [];
+            if (($a = BlockCatalog::canonicalAnimation($row['animation'] ?? null)) !== null) {
+                $props['animation'] = $a;
+            }
+            if (in_array($row['animationSpeed'] ?? null, ['fast', 'normal', 'slow'], true)) {
+                $props['animationSpeed'] = $row['animationSpeed'];
+            }
+            if (is_bool($row['animationStagger'] ?? null)) {
+                $props['animationStagger'] = $row['animationStagger'];
+            }
+            if (in_array($row['hoverEffect'] ?? null, BlockCatalog::HOVER_EFFECTS, true)) {
+                $props['hoverEffect'] = $row['hoverEffect'];
+            }
+            if (in_array($row['buttonEffect'] ?? null, BlockCatalog::BUTTON_EFFECTS, true)) {
+                $props['buttonEffect'] = $row['buttonEffect'];
+            }
+            if (in_array($row['textEffect'] ?? null, BlockCatalog::TEXT_EFFECTS, true)) {
+                $props['textEffect'] = $row['textEffect'];
+            }
+            if (in_array($row['textSpeed'] ?? null, ['fast', 'normal', 'slow'], true)) {
+                $props['textSpeed'] = $row['textSpeed'];
+            }
+            if ($phrases = MotionSpec::phrases($row['typingPhrases'] ?? null)) {
+                $props['typingPhrases'] = $phrases;
+            }
+            if (($props['animation'] ?? null) === 'custom') {
+                $custom = MotionSpec::entrance($row['customAnimation'] ?? null);
+                if ($custom) {
+                    $props['customAnimation'] = $custom;
+                } else {
+                    unset($props['animation']); // no usable recipe: leave the animation as it was
+                }
+            }
+            if (is_array($row['bgEffect'] ?? null)) {
+                // kind "none" → remove the effect (null); otherwise a clamped, data-only spec
+                $props['bgEffect'] = ($row['bgEffect']['kind'] ?? null) === 'none' ? null : MotionSpec::effect($row['bgEffect']);
+                if ($props['bgEffect'] === null && ($row['bgEffect']['kind'] ?? null) !== 'none') {
+                    unset($props['bgEffect']);
+                }
+            }
+            if ($props) {
+                $changes[] = ['id' => $id, 'props' => $props];
+            }
+        }
+
+        return [
+            'handled' => true,
+            'summary' => $this->summary($data['summary'] ?? null) ?: ($changes ? 'Animations updated.' : 'Nothing to change — your animations already match that.'),
+            'changes' => $changes,
+        ];
     }
 
     /**
@@ -212,10 +415,39 @@ class AiWebsiteService
         return $this->imageResolver->resolvePlaceholders($schema, $hint);
     }
 
+    /**
+     * The edit models can't output AI-designed motion (bgEffect / customAnimation), so carry
+     * it over from the section as it was — an edit about text must never wipe the stars.
+     */
+    private function keepMotion(array $section, ?array $original): array
+    {
+        if (!$original) {
+            return $section;
+        }
+        $before = $original['props'] ?? [];
+        foreach (BlockCatalog::MOTION_PROPS as $key) {
+            if (!isset($section['props'][$key]) && !empty($before[$key])) {
+                $section['props'][$key] = $before[$key];
+            }
+        }
+        // Keep a custom entrance unless the edit chose a different animation on purpose.
+        if (($before['animation'] ?? null) === 'custom' && !empty($before['customAnimation'])
+            && in_array($section['props']['animation'] ?? null, [null, 'custom', 'fade-up'], true)) {
+            $section['props']['animation'] = 'custom';
+        }
+
+        return $section;
+    }
+
     /** Strip noise the model doesn't need (keeps token use and latency down). */
     private function forModel(array $schema): array
     {
         unset($schema['version']);
+        foreach ($schema['sections'] ?? [] as $i => $section) {
+            foreach (BlockCatalog::MOTION_PROPS as $key) {
+                unset($schema['sections'][$i]['props'][$key]);
+            }
+        }
 
         return $schema;
     }

@@ -80,6 +80,30 @@ class AiController extends Controller
         ), allowStream: false);
     }
 
+    /** Animation / hover-only edits (fast, and can't change any content). */
+    public function animate(Request $request, AiWebsiteService $ai)
+    {
+        $request->validate([
+            'sections' => 'required|array|max:60',
+            'sections.*.id' => 'required|string|max:100',
+            'sections.*.type' => 'required|string|max:40',
+            'sections.*.props' => 'nullable|array',
+            'selected' => 'nullable|string|max:100',
+            'instruction' => 'required|string|max:1000',
+            'extract' => 'nullable|boolean',
+            'theme' => 'nullable|array',
+        ]);
+
+        return $this->respond($request, fn () => $ai->animate(
+            $request->sections,
+            $request->instruction,
+            $request->selected,
+            $request->user()->id,
+            (bool) $request->boolean('extract'),
+            (array) $request->input('theme', []),
+        ), allowStream: false);
+    }
+
     /** Matching photos for card titles ("Oxford shirt", "Wool scarf"…). No AI tokens used. */
     public function photos(Request $request, \App\Services\ImageResolver $images)
     {

@@ -27,6 +27,46 @@ final class BlockCatalog
 
     private const IMAGE_STYLE = ['imageRadius', 'imageShadow', 'imageBorder'];
 
+    /** Entrance animations a section can use (see resources/css/site-animations.css). */
+    public const ANIMATIONS = ['none', 'fade', 'fade-up', 'fade-down', 'from-left', 'from-right', 'zoom', 'blur', 'flip', 'custom'];
+
+    /** AI-designed motion stored next to the catalog props (see MotionSpec); kept across AI edits. */
+    public const MOTION_PROPS = ['bgEffect', 'customAnimation', 'typingPhrases'];
+
+    /** Older / natural names → current value ("slide-left" moved left, i.e. came FROM the right). */
+    public const ANIMATION_ALIASES = [
+        'slide-left' => 'from-right', 'slide-right' => 'from-left',
+        'slide-from-left' => 'from-left', 'slide-from-right' => 'from-right', 'left' => 'from-left', 'right' => 'from-right',
+        'fade-in' => 'fade', 'fadein' => 'fade', 'fade-in-up' => 'fade-up', 'slide-up' => 'fade-up', 'up' => 'fade-up',
+        'fade-in-down' => 'fade-down', 'slide-down' => 'fade-down', 'down' => 'fade-down',
+        'zoom-in' => 'zoom', 'scale' => 'zoom', 'pop' => 'zoom', 'blur-in' => 'blur', 'flip-up' => 'flip', 'off' => 'none',
+    ];
+
+    public const HOVER_EFFECTS = ['none', 'lift', 'zoom', 'glow'];
+
+    /** Attention effects for the section's buttons (see resources/css/site-animations.css). */
+    public const BUTTON_EFFECTS = ['none', 'pulse', 'shine', 'glow', 'bounce', 'wiggle', 'pop'];
+
+    /** Effects for the section's main heading (see resources/js/site/animRuntime.js). */
+    public const TEXT_EFFECTS = ['none', 'typing', 'typing-loop', 'words', 'letters', 'gradient', 'highlight'];
+
+    /** Props applied by BlockRenderer / the export wrapper rather than by the block itself. */
+    public const WRAPPER_PROPS = ['sectionBg', 'sectionText', 'animation', 'animationSpeed', 'animationStagger', 'hoverEffect', 'buttonEffect', 'textEffect', 'textSpeed'];
+
+    private const ANIMATION_PROPS = ['animation', 'animationSpeed', 'animationStagger', 'hoverEffect', 'buttonEffect', 'textEffect', 'textSpeed'];
+
+    /** Map any accepted spelling to a current animation value (null when unknown). */
+    public static function canonicalAnimation(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+        $v = strtolower(trim(str_replace([' ', '_'], '-', $value)));
+        $v = self::ANIMATION_ALIASES[$v] ?? $v;
+
+        return in_array($v, self::ANIMATIONS, true) ? $v : null;
+    }
+
     private static ?array $blocks = null;
 
     /* ------------------------------------------------------------------
@@ -283,6 +323,14 @@ final class BlockCatalog
         foreach ($blocks as &$block) {
             $block['props']['sectionBg'] = self::color('Optional section background colour (hex). Use sparingly for rhythm; always pair with sectionText.');
             $block['props']['sectionText'] = self::color('Optional section text colour (hex) that contrasts with sectionBg.');
+            // …and animate in when scrolled into view.
+            $block['props']['animation'] = self::choice(self::ANIMATIONS, 'Entrance animation of the section content when it scrolls into view (null = none). "custom" = an AI-designed move: keep it only if the section already uses it');
+            $block['props']['animationSpeed'] = self::choice(['fast', 'normal', 'slow'], 'Animation speed');
+            $block['props']['animationStagger'] = self::flag('Content (heading, text, each card) appears one after another');
+            $block['props']['hoverEffect'] = self::choice(self::HOVER_EFFECTS, 'Hover effect on cards and photos');
+            $block['props']['buttonEffect'] = self::choice(self::BUTTON_EFFECTS, 'Animated effect on this section\'s buttons');
+            $block['props']['textEffect'] = self::choice(self::TEXT_EFFECTS, 'Effect on the section\'s main heading (typing = typewriter)');
+            $block['props']['textSpeed'] = self::choice(['fast', 'normal', 'slow'], 'Heading effect speed');
         }
 
         return self::$blocks = $blocks;
@@ -487,7 +535,7 @@ final class BlockCatalog
         foreach (self::blocks() as $type => $block) {
             $props = [];
             foreach ($block['props'] as $key => $spec) {
-                if (in_array($key, ['sectionBg', 'sectionText', ...self::IMAGE_STYLE], true)) {
+                if (in_array($key, ['sectionBg', 'sectionText', ...self::IMAGE_STYLE, ...self::ANIMATION_PROPS], true)) {
                     continue;
                 }
                 $props[] = self::describeProp($key, $spec);
@@ -497,6 +545,7 @@ final class BlockCatalog
         }
         $lines[] = '- Every section also accepts sectionBg + sectionText (hex) to override its colours.';
         $lines[] = '- Image styling: imageRadius (none|sm|md|lg|xl|full), imageShadow (none|sm|md|lg|xl), imageBorder (none|thin|thick).';
+        $lines[] = '- Animation (every section): animation (' . implode('|', self::ANIMATIONS) . '), animationSpeed (fast|normal|slow), animationStagger (true = content appears one by one), hoverEffect (' . implode('|', self::HOVER_EFFECTS) . '), buttonEffect (' . implode('|', self::BUTTON_EFFECTS) . '), textEffect (' . implode('|', self::TEXT_EFFECTS) . ') + textSpeed on the main heading.';
 
         return implode("\n", $lines);
     }

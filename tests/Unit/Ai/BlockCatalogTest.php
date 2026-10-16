@@ -63,7 +63,7 @@ it('only describes props the Vue blocks actually read (guards against prompt dri
         $source = file_get_contents(dirname(__DIR__, 3) . ('/resources/js/Components/builder/blocks/Block' . ucfirst($type) . '.vue'));
 
         foreach (BlockCatalog::props($type) as $key => $spec) {
-            if (in_array($key, ['sectionBg', 'sectionText'], true)) {
+            if (in_array($key, BlockCatalog::WRAPPER_PROPS, true)) {
                 continue; // applied by BlockRenderer, not the block itself
             }
             expect(str_contains($source, $key))->toBeTrue("{$type}.{$key} is not used by Block" . ucfirst($type) . '.vue');

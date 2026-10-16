@@ -1,4 +1,5 @@
 <script setup>
+import { ANIMATION_INTENT, aiAnimate } from './animPreview';
 import { ref, computed, nextTick, watch } from 'vue';
 import { useEditor } from '@/stores/editor.js';
 import { BLOCK_TYPES } from '@/schema/defaults.js';
@@ -102,11 +103,28 @@ async function submit() {
     };
 
     try {
+        // Animation-only requests: a fast edit that can't touch any content.
+        if (mode.value !== 'generate' && ANIMATION_INTENT.test(prompt.value)) {
+            statusText.value = 'Choreographing animations…';
+            progress.value = 0.3;
+            const result = await aiAnimate(editor, prompt.value, mode.value === 'section' ? selectedBlock.value?.id : null);
+            if (result.handled) {
+                notify(result.summary, 'success', { duration: 6000 });
+                prompt.value = '';
+                return;
+            }
+        }
+        const wantsMotion = ANIMATION_INTENT.test(prompt.value);
         if (mode.value === 'generate') {
             // Generate a new site — streamed so long generations show live progress
             statusText.value = generateStatusMessages[0];
             const data = await streamAi(route('ai.generate'), { prompt: prompt.value, project_id: props.projectId }, onProgress);
             emit('generated', data.schema);
+            // "…with twinkling stars in the background": design the effects too.
+            if (wantsMotion && editor.schema) {
+                statusText.value = 'Adding animations & effects…';
+                await aiAnimate(editor, prompt.value, null, { extract: true }).catch(() => null);
+            }
         } else if (mode.value === 'section' && selectedBlock.value) {
             // Edit the selected section only (short request, plain JSON)
             startStatusCycle(editStatusMessages);
@@ -116,13 +134,15 @@ async function submit() {
                 instruction: prompt.value,
             });
             editor.updateSection(selectedBlock.value.id, data.section);
-            notify(data.summary || 'Section updated.', 'success', { duration: 6000 });
+            const motion = wantsMotion ? await aiAnimate(editor, prompt.value, selectedBlock.value.id, { extract: true }).catch(() => null) : null;
+            notify([data.summary || 'Section updated.', motion?.summary].filter(Boolean).join(' '), 'success', { duration: 6000 });
         } else {
             // Edit the full site — streamed
             statusText.value = editStatusMessages[0];
             const data = await streamAi(route('ai.edit'), { schema: editor.schema, instruction: prompt.value }, onProgress);
             editor.setSchema(data.schema);
-            notify(data.summary || 'Site updated.', 'success', { duration: 6000 });
+            const motion = wantsMotion ? await aiAnimate(editor, prompt.value, null, { extract: true }).catch(() => null) : null;
+            notify([data.summary || 'Site updated.', motion?.summary].filter(Boolean).join(' '), 'success', { duration: 6000 });
         }
         prompt.value = '';
     } catch (err) {

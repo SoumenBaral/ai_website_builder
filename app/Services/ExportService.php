@@ -48,6 +48,11 @@ class ExportService
                     $html = '<div style="' . $vars . ';">' . $html . '</div>';
                 }
 
+                // Entrance animation + hover effect (see resources/js/site/animRuntime.js)
+                if ($attrs = self::animationAttributes($block)) {
+                    $html = '<div' . $attrs . '>' . $html . '</div>';
+                }
+
                 if (!empty($anchors[$index])) {
                     $html = '<div id="' . e($anchors[$index]) . '" style="scroll-margin-top: 72px;">' . $html . '</div>';
                 }
@@ -62,7 +67,70 @@ class ExportService
             'body' => $body,
             'beacon' => $beacon,
             'head' => app(FaviconService::class)->headTags($favicon, $schema, $faviconBase),
+            'animations' => self::usesAnimations($schema) ? file_get_contents(resource_path('css/site-animations.css')) : null,
+            'animationRuntime' => self::usesAnimations($schema) ? file_get_contents(resource_path('js/site/animRuntime.js')) : null,
         ])->render();
+    }
+
+    /** data-* attributes for a section's animation and hover effect ('' when it has neither). */
+    public static function animationAttributes(array $block): string
+    {
+        $props = $block['props'] ?? [];
+        $attrs = '';
+        $anim = BlockCatalog::canonicalAnimation($props['animation'] ?? null);
+        $custom = $anim === 'custom' ? \App\Services\Ai\MotionSpec::entrance($props['customAnimation'] ?? null) : null;
+        if ($anim === 'custom' && !$custom) {
+            $anim = 'fade-up';
+        }
+        if ($anim && $anim !== 'none') {
+            $attrs .= ' data-anim="' . $anim . '"';
+            if ($custom) {
+                $attrs .= " data-anim-custom='" . e(json_encode($custom, JSON_UNESCAPED_UNICODE)) . "'";
+            }
+            if (in_array($props['animationSpeed'] ?? null, ['fast', 'slow'], true)) {
+                $attrs .= ' data-anim-speed="' . $props['animationSpeed'] . '"';
+            }
+            if (!empty($props['animationStagger'])) {
+                $attrs .= ' data-anim-stagger';
+            }
+            if (($block['type'] ?? '') === 'navbar') {
+                $attrs .= ' data-anim-whole'; // the bar moves as one piece
+            }
+        }
+        if ($effect = \App\Services\Ai\MotionSpec::effect($props['bgEffect'] ?? null)) {
+            $attrs .= " data-fx='" . e(json_encode($effect, JSON_UNESCAPED_UNICODE)) . "'";
+        }
+        $text = $props['textEffect'] ?? null;
+        if (in_array($text, BlockCatalog::TEXT_EFFECTS, true) && $text !== 'none') {
+            $attrs .= ' data-text-fx="' . $text . '"';
+            if (in_array($props['textSpeed'] ?? null, ['fast', 'slow'], true)) {
+                $attrs .= ' data-text-speed="' . $props['textSpeed'] . '"';
+            }
+            if ($text === 'typing-loop' && ($phrases = \App\Services\Ai\MotionSpec::phrases($props['typingPhrases'] ?? null))) {
+                $attrs .= " data-text-phrases='" . e(json_encode($phrases, JSON_UNESCAPED_UNICODE)) . "'";
+            }
+        }
+        $buttons = $props['buttonEffect'] ?? null;
+        if (in_array($buttons, BlockCatalog::BUTTON_EFFECTS, true) && $buttons !== 'none') {
+            $attrs .= ' data-btn-fx="' . $buttons . '"';
+        }
+        $hover = $props['hoverEffect'] ?? null;
+        if (in_array($hover, BlockCatalog::HOVER_EFFECTS, true) && $hover !== 'none') {
+            $attrs .= ' data-hover="' . $hover . '"';
+        }
+
+        return $attrs;
+    }
+
+    private static function usesAnimations(array $schema): bool
+    {
+        foreach ($schema['sections'] ?? [] as $section) {
+            if (self::animationAttributes($section) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function toZip(array $schema, ?Project $project = null): string

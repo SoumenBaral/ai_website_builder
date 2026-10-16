@@ -26,9 +26,18 @@
             margin: 0;
         }
     </style>
+@if(!empty($animations))
+    <style>{!! $animations !!}</style>
+@endif
 </head>
-<body>
+<body @if(!empty($animations)) class="anim-clip" @endif>
 {!! $body !!}
+@if(!empty($animationRuntime))
+<script>
+{!! $animationRuntime !!}
+window.SiteAnim && window.SiteAnim.init();
+</script>
+@endif
 @if(!empty($beacon))
 {!! $beacon !!}
 @endif

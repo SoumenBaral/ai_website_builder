@@ -5,6 +5,7 @@ import Icon from '@/Components/Landing/Icon.vue';
 import ImagePicker from './ImagePicker.vue';
 import { useFavicon } from './useFavicon';
 import { useToast } from './useToast';
+import { ANIMATION_PRESETS, BUTTON_EFFECTS, canonicalAnimation, replayAnimation } from './animPreview';
 
 const editor = useEditor();
 const theme = computed(() => editor.schema?.theme);
@@ -49,6 +50,40 @@ function applyPalette(p) {
 }
 const isActivePalette = (p) => theme.value
     && [theme.value.primaryColor, theme.value.secondaryColor, theme.value.backgroundColor, theme.value.textColor].map((c) => (c || '').toLowerCase()).join() === p.colors.join();
+
+/* ---------- Animations (applies to every section, one undo step) ---------- */
+const animationPresets = [
+    { key: 'none', label: 'None', hint: 'Static page' },
+    { key: 'subtle', label: 'Subtle', hint: 'Soft fades, card lift' },
+    { key: 'smooth', label: 'Smooth', hint: 'Fade up, one by one' },
+    { key: 'lively', label: 'Lively', hint: 'Slides, zoom & glow' },
+];
+
+const animatedCount = computed(() => (editor.schema?.sections || []).filter((s) => canonicalAnimation(s.props?.animation) && s.props.animation !== 'none').length);
+
+function applyAnimationPreset(key) {
+    const next = JSON.parse(JSON.stringify(editor.schema));
+    next.sections.forEach((section, i) => {
+        section.props = { ...section.props, ...ANIMATION_PRESETS[key](section.type, i) };
+    });
+    editor.setSchema(next);
+    setTimeout(() => next.sections.forEach((s) => replayAnimation(s.id)), 60);
+    notify(key === 'none' ? 'Animations removed from every section.' : 'Animations applied — scroll the canvas to see them. Fine-tune any section in its Style panel.', 'success');
+}
+
+/* ---------- Button effect for every section (one undo step) ---------- */
+const siteButtonEffect = computed(() => {
+    const values = new Set((editor.schema?.sections || []).map((s) => s.props?.buttonEffect || 'none'));
+    return values.size === 1 ? [...values][0] : 'mixed';
+});
+function applyButtonEffect(value) {
+    const next = JSON.parse(JSON.stringify(editor.schema));
+    next.sections.forEach((s) => {
+        s.props = { ...s.props, buttonEffect: value };
+    });
+    editor.setSchema(next);
+    notify(value === 'none' ? 'Button effects removed.' : `${BUTTON_EFFECTS.find((b) => b.value === value).label} effect added to every button.`, 'success');
+}
 
 /* ---------- Site icon (favicon) ---------- */
 const projectId = inject('projectId');
@@ -220,6 +255,30 @@ const descLength = computed(() => (editor.schema?.meta?.description || '').lengt
                 <button type="button" :class="['ed-option !py-2.5', theme.mode === 'light' && 'ed-option--active']" @click="update('mode', 'light')"><Icon name="sun" :stroke="1.8" class="size-4" />Light</button>
                 <button type="button" :class="['ed-option !py-2.5', theme.mode === 'dark' && 'ed-option--active']" @click="update('mode', 'dark')"><Icon name="moon" :stroke="1.8" class="size-4" />Dark</button>
             </div>
+        </section>
+
+        <!-- Animations -->
+        <section>
+            <div class="flex items-center justify-between">
+                <h4 class="ed-heading">Animations</h4>
+                <span class="text-[11px] text-lp-subtle">{{ animatedCount }} of {{ editor.schema?.sections?.length || 0 }} sections</span>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-2">
+                <button v-for="p in animationPresets" :key="p.key" type="button" class="ed-option flex-col !items-start !gap-0.5 !px-3 !py-2.5 text-left" @click="applyAnimationPreset(p.key)">
+                    <span class="text-[12px] font-semibold text-lp-text">{{ p.label }}</span>
+                    <span class="text-[10.5px] font-normal leading-tight text-lp-subtle">{{ p.hint }}</span>
+                </button>
+            </div>
+            <p class="mt-2 text-[11px] text-lp-subtle">Applies to every section. You can change one section in its Style panel, or ask the AI.</p>
+
+            <div class="mt-5 flex items-center justify-between">
+                <h4 class="ed-heading">Button effect</h4>
+                <span v-if="siteButtonEffect === 'mixed'" class="text-[11px] text-lp-subtle">Mixed</span>
+            </div>
+            <div class="mt-3 grid grid-cols-4 gap-1.5">
+                <button v-for="b in BUTTON_EFFECTS" :key="b.value" type="button" :title="b.hint" :class="['ed-option !px-1 !py-2 text-[11.5px]', siteButtonEffect === b.value && 'ed-option--active']" @click="applyButtonEffect(b.value)">{{ b.label }}</button>
+            </div>
+            <p class="mt-2 text-[11px] text-lp-subtle">Pulse and shine draw the eye to your calls to action.</p>
         </section>
 
         <!-- SEO -->
