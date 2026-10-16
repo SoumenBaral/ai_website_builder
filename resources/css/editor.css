@@ -1,0 +1,129 @@
+/* =====================================================================
+   Editor UI controls — shared by the builder panels (Inspector, Theme,
+   Layers, custom elements, image picker). Scoped to `.editor-ui` and
+   built on the landing design tokens, so they follow light/dark mode.
+
+   The website canvas is NOT styled here: it renders the user's own site.
+   ===================================================================== */
+
+.editor-ui .ed-heading {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgb(var(--lp-subtle));
+}
+
+.editor-ui .ed-label {
+    margin-bottom: 0.35rem;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgb(var(--lp-muted));
+}
+
+.editor-ui .ed-input,
+.editor-ui .ed-select,
+.editor-ui .ed-textarea {
+    border-radius: 0.6rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.1) !important;
+    background-color: rgb(var(--lp-ink) / 0.03) !important;
+    padding: 0.45rem 0.7rem;
+    font-size: 13px;
+    line-height: 1.4;
+    color: rgb(var(--lp-fg));
+    box-shadow: none !important;
+    transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+.editor-ui .ed-textarea { resize: vertical; min-height: 4.5rem; }
+.editor-ui .ed-select {
+    padding-right: 2rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23888'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z' clip-rule='evenodd'/%3E%3C/svg%3E") !important;
+    background-position: right 0.5rem center !important;
+    background-size: 1rem !important;
+    background-repeat: no-repeat !important;
+}
+.editor-ui .ed-select option { background: rgb(var(--lp-surface)); color: rgb(var(--lp-fg)); }
+.editor-ui .ed-input::placeholder,
+.editor-ui .ed-textarea::placeholder { color: rgb(var(--lp-subtle) / 0.8); }
+.editor-ui .ed-input:hover,
+.editor-ui .ed-select:hover,
+.editor-ui .ed-textarea:hover { border-color: rgb(var(--lp-ink) / 0.18) !important; }
+.editor-ui .ed-input:focus,
+.editor-ui .ed-select:focus,
+.editor-ui .ed-textarea:focus {
+    outline: none;
+    border-color: rgb(139 92 246 / 0.7) !important;
+    background-color: rgb(var(--lp-surface)) !important;
+    box-shadow: 0 0 0 3px rgb(139 92 246 / 0.15) !important;
+}
+.editor-ui .ed-input-sm { padding: 0.35rem 0.6rem; font-size: 12px; }
+
+/* Default display kept at zero specificity so Tailwind utilities (`hidden`, `sm:inline-flex`…) always win */
+:where(.editor-ui) :where(.ed-label, .ed-input, .ed-select, .ed-textarea) { display: block; }
+:where(.editor-ui) :where(.ed-input, .ed-select, .ed-textarea) { width: 100%; }
+:where(.editor-ui) :where(.ed-option, .ed-icon-btn) { display: inline-flex; }
+
+/* Colour swatch input */
+.editor-ui .ed-color {
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: 0.6rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.12);
+    background: none;
+    padding: 0;
+}
+.editor-ui .ed-color::-webkit-color-swatch-wrapper { padding: 0; }
+.editor-ui .ed-color::-webkit-color-swatch { border: 0; border-radius: 0.5rem; }
+.editor-ui .ed-color::-moz-color-swatch { border: 0; border-radius: 0.5rem; }
+
+/* Pill / option buttons */
+.editor-ui .ed-option {
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border-radius: 0.55rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.1);
+    background: rgb(var(--lp-ink) / 0.02);
+    padding: 0.4rem 0.6rem;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgb(var(--lp-muted));
+    transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+.editor-ui .ed-option:hover { border-color: rgb(var(--lp-ink) / 0.2); color: rgb(var(--lp-fg)); }
+.editor-ui .ed-option--active,
+.editor-ui .ed-option--active:hover {
+    border-color: rgb(139 92 246 / 0.6);
+    background: rgb(139 92 246 / 0.1);
+    color: rgb(var(--lp-accent));
+}
+
+/* Icon button (toolbar, panel actions) */
+.editor-ui .ed-icon-btn {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.55rem;
+    color: rgb(var(--lp-muted));
+    transition: background-color 0.15s, color 0.15s;
+}
+.editor-ui .ed-icon-btn:hover:not(:disabled) { background: rgb(var(--lp-ink) / 0.07); color: rgb(var(--lp-fg)); }
+.editor-ui .ed-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.editor-ui .ed-icon-btn--danger:hover:not(:disabled) { background: rgb(244 63 94 / 0.1); color: rgb(244 63 94); }
+
+/* Nested item cards (links, features, plans…) */
+.editor-ui .ed-item {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.08);
+    background: rgb(var(--lp-ink) / 0.02);
+}
+
+/* Thin scrollbars inside panels */
+.editor-ui .ed-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--lp-ink) / 0.15) transparent; }
+.editor-ui .ed-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.editor-ui .ed-scroll::-webkit-scrollbar-thumb { border-radius: 9999px; background: rgb(var(--lp-ink) / 0.12); border: 2px solid transparent; background-clip: padding-box; }

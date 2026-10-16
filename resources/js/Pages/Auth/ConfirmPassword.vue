@@ -1,10 +1,8 @@
 <script setup>
-import GuestLayout from '@/Layouts/GuestLayout.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
 import { Head, useForm } from '@inertiajs/vue3';
+import AuthLayout from '@/Layouts/AuthLayout.vue';
+import AuthInput from '@/Components/Auth/AuthInput.vue';
+import AuthButton from '@/Components/Auth/AuthButton.vue';
 
 const form = useForm({
     password: '',
@@ -18,38 +16,23 @@ const submit = () => {
 </script>
 
 <template>
-    <GuestLayout>
-        <Head title="Confirm Password" />
+    <AuthLayout icon="shield" title="Confirm it's" accent="you." subtitle="This is a secure area. Please confirm your password before continuing.">
+        <Head title="Confirm password" />
 
-        <div class="mb-4 text-sm text-gray-600">
-            This is a secure area of the application. Please confirm your
-            password before continuing.
-        </div>
+        <form class="space-y-6" novalidate @submit.prevent="submit">
+            <AuthInput
+                id="password"
+                v-model="form.password"
+                type="password"
+                label="Password"
+                icon="lock"
+                autocomplete="current-password"
+                :error="form.errors.password"
+                required
+                autofocus
+            />
 
-        <form @submit.prevent="submit">
-            <div>
-                <InputLabel for="password" value="Password" />
-                <TextInput
-                    id="password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    v-model="form.password"
-                    required
-                    autocomplete="current-password"
-                    autofocus
-                />
-                <InputError class="mt-2" :message="form.errors.password" />
-            </div>
-
-            <div class="mt-4 flex justify-end">
-                <PrimaryButton
-                    class="ms-4"
-                    :class="{ 'opacity-25': form.processing }"
-                    :disabled="form.processing"
-                >
-                    Confirm
-                </PrimaryButton>
-            </div>
+            <AuthButton :loading="form.processing">Confirm</AuthButton>
         </form>
-    </GuestLayout>
+    </AuthLayout>
 </template>

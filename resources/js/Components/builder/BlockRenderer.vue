@@ -15,6 +15,7 @@ import BlockStats from './blocks/BlockStats.vue';
 import BlockFaq from './blocks/BlockFaq.vue';
 import BlockTeam from './blocks/BlockTeam.vue';
 import BlockCustom from './blocks/BlockCustom.vue';
+import { BLOCK_TYPES } from '@/schema/defaults.js';
 
 const blockMap = {
     navbar: BlockNavbar,
@@ -42,6 +43,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:props', 'select']);
 const component = computed(() => blockMap[props.block.type]);
+const label = computed(() => BLOCK_TYPES[props.block.type]?.label || props.block.type);
 
 const sectionStyle = computed(() => {
     const bg = props.block.props?.sectionBg;
@@ -63,10 +65,10 @@ const sectionStyle = computed(() => {
 
 <template>
     <div
-        @click.stop="emit('select', block.id)"
-        class="relative group transition-all"
-        :class="{ 'ring-2 ring-blue-500 ring-offset-2': selected }"
+        :data-block-id="editable ? block.id : undefined"
+        :class="['relative', editable && 'group/block cursor-pointer']"
         :style="sectionStyle"
+        @click.stop="editable && emit('select', block.id)"
     >
         <component
             v-if="component"
@@ -80,12 +82,19 @@ const sectionStyle = computed(() => {
             Unknown block type: {{ block.type }}
         </div>
 
-        <!-- Block type label on hover -->
-        <div
-            v-if="editable"
-            class="absolute top-0 left-0 px-2 py-0.5 text-xs font-medium text-white bg-blue-500 rounded-br opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10"
-        >
-            {{ block.type }}
-        </div>
+        <!-- Editor-only selection chrome (overlay, never affects the site's layout) -->
+        <template v-if="editable">
+            <div
+                class="pointer-events-none absolute inset-0 z-10 transition-[box-shadow] duration-150"
+                :class="selected ? 'shadow-[inset_0_0_0_2px_#8b5cf6]' : 'group-hover/block:shadow-[inset_0_0_0_1px_rgba(139,92,246,0.6)]'"
+            ></div>
+            <div
+                class="pointer-events-none absolute left-2 top-2 z-20 rounded-md px-2 py-0.5 text-[11px] font-semibold text-white shadow-lg transition-opacity duration-150"
+                :class="selected ? 'bg-violet-600 opacity-100' : 'bg-violet-500/90 opacity-0 group-hover/block:opacity-100'"
+                style="font-family: Figtree, ui-sans-serif, system-ui, sans-serif; letter-spacing: 0;"
+            >
+                {{ label }}
+            </div>
+        </template>
     </div>
 </template>

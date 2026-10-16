@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AnalyticsEvent;
 use App\Models\Page;
 use App\Models\Project;
 use Illuminate\Http\Request;
@@ -12,14 +13,61 @@ class ProjectController extends Controller
 {
     public function index(Request $request)
     {
-        $projects = $request->user()
-            ->projects()
-            ->latest()
+        $user = $request->user();
+
+        $projects = $user->projects()
+            ->with('homePage:id,project_id,schema')
+            ->withCount('pages')
+            ->latest('updated_at')
             ->get();
 
+        // Page views over the last 30 days, one grouped query for all projects.
+        $views = AnalyticsEvent::whereIn('project_id', $projects->pluck('id'))
+            ->where('event', 'pageview')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->selectRaw('project_id, COUNT(*) as views')
+            ->groupBy('project_id')
+            ->pluck('views', 'project_id');
+
         return Inertia::render('Dashboard', [
-            'projects' => $projects,
+            'projects' => $projects->map(fn (Project $project) => [
+                'id' => $project->id,
+                'name' => $project->name,
+                'slug' => $project->slug,
+                'description' => $project->description,
+                'status' => $project->status,
+                'pages_count' => $project->pages_count,
+                'views' => (int) ($views[$project->id] ?? 0),
+                'created_at' => $project->created_at,
+                'updated_at' => $project->updated_at,
+                'preview' => $this->previewFor($project),
+            ])->values(),
         ]);
+    }
+
+    /**
+     * A lightweight summary of the home page (theme + first sections) so the
+     * dashboard can draw a miniature of each site without loading full schemas.
+     */
+    private function previewFor(Project $project): array
+    {
+        $schema = $project->homePage?->schema ?? [];
+        $theme = $schema['theme'] ?? [];
+        $sections = collect($schema['sections'] ?? []);
+        $hero = $sections->firstWhere('type', 'hero')['props'] ?? [];
+        $navbar = $sections->firstWhere('type', 'navbar')['props'] ?? [];
+
+        return [
+            'primary' => $theme['primaryColor'] ?? '#6366f1',
+            'background' => $theme['backgroundColor'] ?? '#ffffff',
+            'text' => $theme['textColor'] ?? '#0f172a',
+            'font' => $theme['fontHeading'] ?? null,
+            'brand' => is_string($navbar['brand'] ?? null) ? $navbar['brand'] : null,
+            'heading' => is_string($hero['heading'] ?? null) ? Str::limit($hero['heading'], 80) : null,
+            'cta' => is_string($hero['ctaText'] ?? null) ? $hero['ctaText'] : null,
+            'image' => is_string($hero['image'] ?? null) ? $hero['image'] : null,
+            'sections' => $sections->pluck('type')->filter()->values()->all(),
+        ];
     }
 
     public function store(Request $request)

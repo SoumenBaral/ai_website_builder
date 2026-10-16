@@ -1,6 +1,10 @@
 <script setup>
-import { ref, computed, provide, onMounted, onUnmounted } from 'vue';
+import '../../css/landing.css';
+import '../../css/editor.css';
+import { ref, computed, provide, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
+import { watchDebounced } from '@vueuse/core';
+import axios from 'axios';
 import { useEditor } from '@/stores/editor.js';
 import { themeToVars } from '@/composables/useTheme.js';
 import BlockRenderer from '@/Components/builder/BlockRenderer.vue';
@@ -9,43 +13,48 @@ import BlockTree from '@/Components/builder/BlockTree.vue';
 import Inspector from '@/Components/builder/Inspector.vue';
 import ThemePanel from '@/Components/builder/ThemePanel.vue';
 import VersionHistory from '@/Components/builder/VersionHistory.vue';
-import { watchDebounced } from '@vueuse/core';
-import axios from 'axios';
+import EditorToasts from '@/Components/builder/EditorToasts.vue';
+import { useToast } from '@/Components/builder/useToast';
+import Icon from '@/Components/Landing/Icon.vue';
+import ThemeToggle from '@/Components/Landing/ThemeToggle.vue';
+import AppMenu from '@/Components/App/AppMenu.vue';
+import { useColorMode, useDocumentTheme } from '@/Components/Landing/useColorMode';
 
 const props = defineProps({
     project: Object,
     page: Object,
 });
 
-function exportZip() {
-    window.location.href = route('export.download', props.project.id);
-}
-
-function publishSite() {
-    router.post(route('projects.publish', props.project.id), {}, {
-        onSuccess: () => showNotification('Site published!', 'success'),
-    });
-}
-
-function unpublishSite() {
-    router.post(route('projects.unpublish', props.project.id), {}, {
-        onSuccess: () => showNotification('Site unpublished.', 'success'),
-    });
-}
-
 const editor = useEditor();
+const { notify } = useToast();
+const { theme: uiTheme } = useColorMode();
+useDocumentTheme();
 provide('projectId', props.project.id);
-const previewWidth = ref('100%');
+
+/* ---------- Layout state ---------- */
+const devices = [
+    { key: 'desktop', width: '100%', icon: 'desktop', label: 'Desktop' },
+    { key: 'tablet', width: '768px', icon: 'tablet', label: 'Tablet' },
+    { key: 'mobile', width: '390px', icon: 'phone', label: 'Mobile' },
+];
+const device = ref('desktop');
+const previewWidth = computed(() => devices.find((d) => d.key === device.value).width);
 const activeRightPanel = ref('inspector'); // 'inspector' | 'theme'
 const showVersionHistory = ref(false);
-const notification = ref(null);
+const layersOpen = ref(false); // drawer below lg
+const panelOpen = ref(false); // drawer below xl
+const canvasScroll = ref(null);
+const promptBar = ref(null);
 
+const isLive = computed(() => props.project.status === 'published');
+const liveUrl = computed(() => `${window.location.origin}/s/${props.project.slug}`);
+const hasSections = computed(() => editor.schema?.sections?.length > 0);
+
+/* ---------- Load + autosave ---------- */
 onMounted(() => {
-    editor.setSchema(props.page.schema);
-    editor.dirty = false;
+    editor.load(props.page.schema);
 });
 
-// Autosave
 watchDebounced(
     () => editor.schema,
     async () => {
@@ -57,7 +66,7 @@ watchDebounced(
             });
             editor.markClean();
         } catch (e) {
-            showNotification('Autosave failed', 'error');
+            notify('Autosave failed — check your connection.', 'error');
         } finally {
             editor.saving = false;
         }
@@ -65,50 +74,90 @@ watchDebounced(
     { debounce: 1200, deep: true },
 );
 
-// Keyboard shortcuts
-function handleKeydown(e) {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        editor.undo();
-    }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        editor.redo();
-    }
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (editor.selectedId && !['INPUT', 'TEXTAREA'].includes(e.target.tagName) && !e.target.contentEditable?.toString().includes('true')) {
-            e.preventDefault();
-            editor.removeBlock(editor.selectedId);
-        }
+const saveState = computed(() => (editor.saving ? 'saving' : editor.dirty ? 'unsaved' : 'saved'));
+
+/* ---------- Publishing ---------- */
+const publishing = ref(false);
+function publishSite() {
+    publishing.value = true;
+    router.post(route('projects.publish', props.project.id), {}, {
+        preserveScroll: true,
+        onSuccess: () => notify('Your site is live!', 'success', { duration: 6000, action: { label: 'View', href: `/s/${props.project.slug}` } }),
+        onError: () => notify('Publishing failed. Please try again.', 'error'),
+        onFinish: () => { publishing.value = false; },
+    });
+}
+function unpublishSite() {
+    router.post(route('projects.unpublish', props.project.id), {}, {
+        preserveScroll: true,
+        onSuccess: () => notify('Site unpublished — it is no longer public.', 'info'),
+    });
+}
+async function copyLink() {
+    try {
+        await navigator.clipboard.writeText(liveUrl.value);
+        notify('Link copied to clipboard', 'success');
+    } catch {
+        notify(liveUrl.value, 'info', { duration: 8000 });
     }
 }
+function exportZip() {
+    window.location.href = route('export.download', props.project.id);
+}
 
-onMounted(() => window.addEventListener('keydown', handleKeydown));
-onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
+/* ---------- Selection helpers ---------- */
+function revealBlock(id) {
+    layersOpen.value = false;
+    nextTick(() => {
+        canvasScroll.value?.querySelector(`[data-block-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+}
+// Selecting something switches the right panel back to the block inspector
+watch(() => editor.selectedId, (id) => { if (id) activeRightPanel.value = 'inspector'; });
 
+/* ---------- AI results ---------- */
 function onGenerated(schema) {
     editor.setSchema(schema);
-    showNotification('Website generated successfully!', 'success');
+    notify('Website generated! Click any section to refine it.', 'success', { duration: 6000 });
 }
-
 function onError(message) {
-    showNotification(message, 'error');
+    notify(message, 'error', { duration: 6000 });
 }
-
-function showNotification(message, type = 'info') {
-    notification.value = { message, type };
-    setTimeout(() => notification.value = null, 4000);
-}
-
 function onUpdateProps(blockId, patch) {
     editor.updateProps(blockId, patch);
 }
 
+/* ---------- Keyboard shortcuts ---------- */
+function isTyping(target) {
+    return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
+}
+function handleKeydown(e) {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey && !isTyping(e.target)) {
+        e.preventDefault();
+        editor.undo();
+    } else if (mod && e.key.toLowerCase() === 'z' && e.shiftKey && !isTyping(e.target)) {
+        e.preventDefault();
+        editor.redo();
+    } else if (mod && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        promptBar.value?.focus();
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && editor.selectedId && !isTyping(e.target)) {
+        e.preventDefault();
+        editor.removeBlock(editor.selectedId);
+    } else if (e.key === 'Escape' && !isTyping(e.target) && !showVersionHistory.value) {
+        if (layersOpen.value || panelOpen.value) { layersOpen.value = false; panelOpen.value = false; }
+        else editor.select(null);
+    }
+}
+onMounted(() => window.addEventListener('keydown', handleKeydown));
+onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
+
+/* ---------- Site theme on the canvas ---------- */
 const themeVars = computed(() => {
     if (!editor.schema?.theme) return {};
     return themeToVars(editor.schema.theme);
 });
-
 const fontLink = computed(() => {
     if (!editor.schema?.theme) return '';
     const h = editor.schema.theme.fontHeading;
@@ -118,172 +167,281 @@ const fontLink = computed(() => {
 </script>
 
 <template>
-    <Head :title="`Editor - ${project.name}`" />
-
+    <Head :title="`Editor · ${project.name}`" />
     <link v-if="fontLink" :href="fontLink" rel="stylesheet" />
 
-    <div class="h-screen flex flex-col bg-gray-50">
-        <!-- Top bar -->
-        <header class="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between shrink-0 z-20">
-            <div class="flex items-center gap-4">
-                <a :href="route('dashboard')" class="text-gray-500 hover:text-gray-700">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+    <div id="editor-root" class="landing editor-ui flex h-[100dvh] flex-col overflow-hidden font-sans antialiased" :data-theme="uiTheme">
+        <!-- ================= Top bar ================= -->
+        <header class="topbar relative z-30 flex h-14 shrink-0 items-center gap-2 px-2 sm:px-3">
+            <!-- Left: back, layers, name, save state -->
+            <div class="flex min-w-0 flex-1 items-center gap-1.5">
+                <a :href="route('dashboard')" class="ed-icon-btn size-9" title="Back to websites" aria-label="Back to websites">
+                    <Icon name="arrowLeft" :stroke="2" class="size-[18px]" />
                 </a>
-                <h1 class="font-semibold text-gray-800 truncate max-w-xs">{{ project.name }}</h1>
-                <span v-if="editor.saving" class="text-xs text-gray-400 animate-pulse">Saving...</span>
-                <span v-else-if="editor.dirty" class="text-xs text-gray-400">Unsaved changes</span>
-                <span v-else class="text-xs text-green-500">Saved</span>
+                <button type="button" class="ed-icon-btn size-9 lg:hidden" title="Layers" aria-label="Show layers" @click="layersOpen = true">
+                    <Icon name="layers" :stroke="1.7" class="size-[18px]" />
+                </button>
+                <span class="mx-1 hidden h-5 w-px bg-lp-ink/10 sm:block"></span>
+                <div class="min-w-0">
+                    <div class="truncate text-sm font-semibold text-lp-fg">{{ project.name }}</div>
+                    <div class="flex items-center gap-1.5 truncate whitespace-nowrap text-[11px] text-lp-subtle">
+                        <template v-if="saveState === 'saving'">
+                            <svg viewBox="0 0 24 24" fill="none" class="size-3 animate-spin"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg>Saving…
+                        </template>
+                        <template v-else-if="saveState === 'unsaved'"><span class="size-1.5 rounded-full bg-amber-500"></span>Unsaved changes</template>
+                        <template v-else><Icon name="checkCircle" :stroke="2" class="size-3 text-emerald-500" />All changes saved</template>
+                    </div>
+                </div>
             </div>
 
-            <div class="flex items-center gap-2">
-                <!-- Undo/Redo -->
-                <button @click="editor.undo()" :disabled="!editor.canUndo" class="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-30" title="Undo (Ctrl+Z)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
-                </button>
-                <button @click="editor.redo()" :disabled="!editor.canRedo" class="p-2 text-gray-500 hover:text-gray-700 disabled:opacity-30" title="Redo (Ctrl+Shift+Z)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"/></svg>
-                </button>
-
-                <div class="w-px h-6 bg-gray-200 mx-1"></div>
-
-                <!-- Responsive toggles -->
-                <button @click="previewWidth = '100%'" :class="previewWidth === '100%' ? 'text-blue-600 bg-blue-50' : 'text-gray-500'" class="p-2 rounded" title="Desktop">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/><path stroke-width="2" d="M8 21h8m-4-4v4"/></svg>
-                </button>
-                <button @click="previewWidth = '768px'" :class="previewWidth === '768px' ? 'text-blue-600 bg-blue-50' : 'text-gray-500'" class="p-2 rounded" title="Tablet">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2" stroke-width="2"/></svg>
-                </button>
-                <button @click="previewWidth = '390px'" :class="previewWidth === '390px' ? 'text-blue-600 bg-blue-50' : 'text-gray-500'" class="p-2 rounded" title="Mobile">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2" stroke-width="2"/><circle cx="12" cy="18" r="1"/></svg>
-                </button>
-
-                <div class="w-px h-6 bg-gray-200 mx-1"></div>
-
-                <!-- Right panel toggles -->
-                <button @click="activeRightPanel = 'inspector'" :class="activeRightPanel === 'inspector' ? 'text-blue-600 bg-blue-50' : 'text-gray-500'" class="px-3 py-1.5 text-xs font-medium rounded">
-                    Inspector
-                </button>
-                <button @click="activeRightPanel = 'theme'" :class="activeRightPanel === 'theme' ? 'text-blue-600 bg-blue-50' : 'text-gray-500'" class="px-3 py-1.5 text-xs font-medium rounded">
-                    Theme
-                </button>
-
-                <div class="w-px h-6 bg-gray-200 mx-1"></div>
-
+            <!-- Centre: device preview -->
+            <div class="segmented hidden md:flex" role="radiogroup" aria-label="Preview size">
                 <button
-                    @click="showVersionHistory = true"
-                    class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+                    v-for="d in devices"
+                    :key="d.key"
+                    type="button"
+                    role="radio"
+                    :aria-checked="device === d.key"
+                    :title="d.label"
+                    :class="['segment', device === d.key && 'segment--active']"
+                    @click="device = d.key"
                 >
-                    History
+                    <Icon :name="d.icon" :stroke="1.7" class="size-4" />
                 </button>
-                <a
-                    :href="route('analytics.dashboard', project.id)"
-                    class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-                >
-                    Analytics
+            </div>
+
+            <!-- Right: history, more, theme, publish -->
+            <div class="flex flex-1 items-center justify-end gap-1">
+                <button type="button" class="ed-icon-btn size-9" :disabled="!editor.canUndo" title="Undo (⌘Z)" aria-label="Undo" @click="editor.undo()"><Icon name="undo" :stroke="1.8" class="size-[18px]" /></button>
+                <button type="button" class="ed-icon-btn size-9" :disabled="!editor.canRedo" title="Redo (⌘⇧Z)" aria-label="Redo" @click="editor.redo()"><Icon name="redo" :stroke="1.8" class="size-[18px]" /></button>
+                <span class="mx-1 hidden h-5 w-px bg-lp-ink/10 sm:block"></span>
+                <button type="button" class="ed-icon-btn hidden size-9 sm:inline-flex" title="Version history" aria-label="Version history" @click="showVersionHistory = true"><Icon name="clock" :stroke="1.7" class="size-[18px]" /></button>
+                <button type="button" :class="['ed-icon-btn size-9 xl:hidden', editor.selectedId && 'text-lp-accent']" title="Properties" aria-label="Show properties panel" @click="panelOpen = true"><Icon name="adjustments" :stroke="1.7" class="size-[18px]" /></button>
+
+                <AppMenu width="w-56">
+                    <template #trigger="{ toggle, open }">
+                        <button type="button" class="ed-icon-btn size-9" :aria-expanded="open" aria-haspopup="menu" aria-label="More actions" @click="toggle"><Icon name="ellipsis" :stroke="2" class="size-5" /></button>
+                    </template>
+                    <template #default="{ close }">
+                        <div class="flex items-center justify-between px-2.5 py-1.5 md:hidden" role="none">
+                            <span class="text-xs font-medium text-lp-subtle">Preview</span>
+                            <div class="flex gap-1">
+                                <button v-for="d in devices" :key="d.key" type="button" :class="['ed-icon-btn size-7', device === d.key && '!text-lp-accent']" :aria-label="d.label" @click="device = d.key; close()"><Icon :name="d.icon" :stroke="1.7" class="size-4" /></button>
+                            </div>
+                        </div>
+                        <button type="button" class="menu-item sm:hidden" role="menuitem" @click="showVersionHistory = true; close()"><Icon name="clock" :stroke="1.7" class="size-4" />Version history</button>
+                        <a :href="route('analytics.dashboard', project.id)" class="menu-item" role="menuitem"><Icon name="chart" :stroke="1.7" class="size-4" />Analytics</a>
+                        <button type="button" class="menu-item" role="menuitem" @click="exportZip(); close()"><Icon name="download" :stroke="1.7" class="size-4" />Download ZIP</button>
+                        <template v-if="isLive">
+                            <div class="menu-sep"></div>
+                            <a :href="`/s/${project.slug}`" target="_blank" rel="noopener" class="menu-item" role="menuitem" @click="close"><Icon name="externalLink" :stroke="1.7" class="size-4" />View live site</a>
+                            <button type="button" class="menu-item" role="menuitem" @click="copyLink(); close()"><Icon name="link" :stroke="1.7" class="size-4" />Copy link</button>
+                            <button type="button" class="menu-item menu-item--danger" role="menuitem" @click="unpublishSite(); close()"><Icon name="xMark" :stroke="1.7" class="size-4" />Unpublish</button>
+                        </template>
+                    </template>
+                </AppMenu>
+
+                <ThemeToggle class="hidden sm:inline-flex" />
+
+                <a v-if="isLive" :href="`/s/${project.slug}`" target="_blank" rel="noopener" class="live-pill ml-1" title="Open the live site">
+                    <span class="relative flex size-2"><span class="live-ping absolute inset-0 rounded-full bg-emerald-400"></span><span class="relative size-2 rounded-full bg-emerald-400"></span></span>
+                    <span class="hidden sm:inline">Live</span>
                 </a>
-
-                <div class="w-px h-6 bg-gray-200 mx-1"></div>
-
-                <button
-                    @click="exportZip"
-                    class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-                >
-                    Export ZIP
+                <button v-else type="button" class="btn btn-primary ml-1 h-9 px-3.5 text-[13px]" :disabled="publishing || !hasSections" :title="hasSections ? 'Publish your site' : 'Add some content first'" @click="publishSite">
+                    <Icon name="rocket" :stroke="1.8" class="size-4" /><span class="hidden sm:inline">{{ publishing ? 'Publishing…' : 'Publish' }}</span>
                 </button>
-                <button
-                    v-if="project.status !== 'published'"
-                    @click="publishSite"
-                    class="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors"
-                >
-                    Publish
-                </button>
-                <template v-else>
-                    <a
-                        :href="`/s/${project.slug}`"
-                        target="_blank"
-                        class="px-3 py-1.5 text-xs font-medium text-green-600 hover:text-green-800"
-                    >
-                        View Live
-                    </a>
-                    <button
-                        @click="unpublishSite"
-                        class="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-red-800"
-                    >
-                        Unpublish
-                    </button>
-                </template>
             </div>
         </header>
 
-        <!-- Prompt bar -->
-        <PromptBar :project-id="project.id" @generated="onGenerated" @error="onError" />
-
-        <!-- Main content -->
-        <div class="flex flex-1 overflow-hidden">
-            <!-- Left sidebar: Block tree -->
-            <BlockTree v-if="editor.schema" class="w-60 shrink-0" />
+        <!-- ================= Workspace ================= -->
+        <div class="relative flex min-h-0 flex-1">
+            <!-- Layers (desktop) -->
+            <aside v-if="editor.schema" class="side-panel hidden w-64 shrink-0 border-r lg:block">
+                <BlockTree @select="revealBlock" />
+            </aside>
 
             <!-- Canvas -->
-            <div class="flex-1 overflow-y-auto p-6 bg-gray-100">
-                <div
-                    v-if="editor.schema?.sections?.length"
-                    class="mx-auto shadow-xl transition-all duration-300 bg-white preview-canvas"
-                    :class="{
-                        'preview-mobile': previewWidth === '390px',
-                        'preview-tablet': previewWidth === '768px',
-                    }"
-                    :style="{ maxWidth: previewWidth, ...themeVars }"
-                    style="font-family: var(--font-body);"
-                >
-                    <BlockRenderer
-                        v-for="block in editor.schema.sections"
-                        :key="block.id"
-                        :block="block"
-                        :editable="true"
-                        :selected="editor.selectedId === block.id"
-                        @select="editor.select"
-                        @update:props="onUpdateProps"
-                    />
+            <main class="canvas-area relative min-w-0 flex-1" @click="editor.select(null)">
+                <div ref="canvasScroll" class="ed-scroll h-full overflow-y-auto px-3 pb-44 pt-5 sm:px-8 sm:pt-8">
+                    <div
+                        v-if="hasSections"
+                        :class="['frame mx-auto transition-[max-width] duration-500', `frame--${device}`]"
+                        :style="{ maxWidth: previewWidth }"
+                        @click.stop
+                    >
+                        <!-- Browser chrome -->
+                        <div class="frame-bar flex items-center gap-2 px-3.5 py-2.5">
+                            <div class="flex gap-1.5"><span class="size-2.5 rounded-full bg-lp-ink/15"></span><span class="size-2.5 rounded-full bg-lp-ink/15"></span><span class="size-2.5 rounded-full bg-lp-ink/15"></span></div>
+                            <div class="mx-auto flex min-w-0 max-w-sm flex-1 items-center justify-center gap-1.5 truncate rounded-md bg-lp-ink/[0.05] px-3 py-1 text-[11px] text-lp-subtle">
+                                <Icon :name="isLive ? 'globe' : 'lock'" :stroke="1.8" class="size-3 shrink-0" />{{ isLive ? `/s/${project.slug}` : 'Draft preview' }}
+                            </div>
+                            <span class="w-10"></span>
+                        </div>
+                        <!-- The user's website — styled only by its own theme -->
+                        <div
+                            class="site-canvas preview-canvas"
+                            :class="{ 'preview-mobile': device === 'mobile', 'preview-tablet': device === 'tablet' }"
+                            :style="themeVars"
+                        >
+                            <BlockRenderer
+                                v-for="block in editor.schema.sections"
+                                :key="block.id"
+                                :block="block"
+                                :editable="true"
+                                :selected="editor.selectedId === block.id"
+                                @select="editor.select"
+                                @update:props="onUpdateProps"
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Empty state -->
-                <div v-else class="flex flex-col items-center justify-center h-full text-gray-400">
-                    <div class="text-6xl mb-4">✨</div>
-                    <p class="text-lg font-medium mb-2">Your canvas is empty</p>
-                    <p class="text-sm">Use the prompt bar above to generate a website with AI,<br>or add blocks manually from the left sidebar.</p>
-                </div>
-            </div>
+                <PromptBar
+                    v-if="editor.schema"
+                    ref="promptBar"
+                    :project-id="project.id"
+                    :initial-prompt="page?.schema?.sections?.length ? '' : (project.description || '')"
+                    @generated="onGenerated"
+                    @error="onError"
+                    @click.stop
+                />
+            </main>
 
-            <!-- Right sidebar -->
-            <div v-if="editor.schema" class="w-80 shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
-                <Inspector v-if="activeRightPanel === 'inspector'" />
-                <ThemePanel v-else-if="activeRightPanel === 'theme'" />
-            </div>
+            <!-- Properties (desktop) -->
+            <aside v-if="editor.schema" class="side-panel hidden w-80 shrink-0 flex-col border-l xl:flex">
+                <div class="panel-tabs shrink-0 p-2.5">
+                    <div class="segmented flex w-full">
+                        <button type="button" :class="['segment flex-1', activeRightPanel === 'inspector' && 'segment--active']" @click="activeRightPanel = 'inspector'"><Icon name="cursorClick" :stroke="1.7" class="size-4" />Section</button>
+                        <button type="button" :class="['segment flex-1', activeRightPanel === 'theme' && 'segment--active']" @click="activeRightPanel = 'theme'"><Icon name="swatch" :stroke="1.7" class="size-4" />Site style</button>
+                    </div>
+                </div>
+                <div class="ed-scroll min-h-0 flex-1 overflow-y-auto">
+                    <Inspector v-if="activeRightPanel === 'inspector'" />
+                    <ThemePanel v-else />
+                </div>
+            </aside>
+
+            <!-- Drawers (smaller screens) -->
+            <Transition name="drawer-left">
+                <div v-if="layersOpen" class="absolute inset-0 z-40 lg:hidden">
+                    <div class="drawer-backdrop absolute inset-0" @click="layersOpen = false"></div>
+                    <aside class="side-panel drawer absolute inset-y-0 left-0 w-72 max-w-[85vw] border-r">
+                        <BlockTree @select="revealBlock" />
+                    </aside>
+                </div>
+            </Transition>
+            <Transition name="drawer-right">
+                <div v-if="panelOpen" class="absolute inset-0 z-40 xl:hidden">
+                    <div class="drawer-backdrop absolute inset-0" @click="panelOpen = false"></div>
+                    <aside class="side-panel drawer absolute inset-y-0 right-0 flex w-80 max-w-[90vw] flex-col border-l">
+                        <div class="panel-tabs flex shrink-0 items-center gap-2 p-2.5">
+                            <div class="segmented flex flex-1">
+                                <button type="button" :class="['segment flex-1', activeRightPanel === 'inspector' && 'segment--active']" @click="activeRightPanel = 'inspector'">Section</button>
+                                <button type="button" :class="['segment flex-1', activeRightPanel === 'theme' && 'segment--active']" @click="activeRightPanel = 'theme'">Site style</button>
+                            </div>
+                            <button type="button" class="ed-icon-btn" aria-label="Close panel" @click="panelOpen = false"><Icon name="xMark" :stroke="2" class="size-5" /></button>
+                        </div>
+                        <div class="ed-scroll min-h-0 flex-1 overflow-y-auto">
+                            <Inspector v-if="activeRightPanel === 'inspector'" />
+                            <ThemePanel v-else />
+                        </div>
+                    </aside>
+                </div>
+            </Transition>
         </div>
 
-        <!-- Version History panel -->
-        <VersionHistory
-            v-if="showVersionHistory"
-            :project-id="project.id"
-            @close="showVersionHistory = false"
-        />
-
-        <!-- Notification toast -->
-        <Transition enter-active-class="transition duration-300" enter-from-class="opacity-0 translate-y-4" leave-active-class="transition duration-200" leave-to-class="opacity-0 translate-y-4">
-            <div
-                v-if="notification"
-                class="fixed bottom-6 right-6 px-4 py-3 rounded-lg shadow-lg text-sm font-medium z-50"
-                :class="{
-                    'bg-green-50 text-green-800 border border-green-200': notification.type === 'success',
-                    'bg-red-50 text-red-800 border border-red-200': notification.type === 'error',
-                    'bg-blue-50 text-blue-800 border border-blue-200': notification.type === 'info',
-                }"
-            >
-                {{ notification.message }}
-            </div>
-        </Transition>
+        <VersionHistory v-if="showVersionHistory" :project-id="project.id" @close="showVersionHistory = false" />
+        <EditorToasts />
     </div>
 </template>
+
+<style scoped>
+.topbar {
+    border-bottom: 1px solid rgb(var(--lp-ink) / 0.08);
+    background: rgb(var(--lp-bg));
+}
+.side-panel {
+    border-color: rgb(var(--lp-ink) / 0.08);
+    background: rgb(var(--lp-bg));
+}
+.panel-tabs { border-bottom: 1px solid rgb(var(--lp-ink) / 0.07); }
+
+/* Dotted workspace behind the site */
+.canvas-area {
+    background-color: rgb(var(--lp-ink) / 0.025);
+    background-image: radial-gradient(rgb(var(--lp-ink) / 0.09) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.frame {
+    overflow: hidden;
+    border-radius: 0.9rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.1);
+    background: rgb(var(--lp-surface));
+    box-shadow: 0 30px 80px -30px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(0 0 0 / 0.02);
+}
+.frame--mobile { border-radius: 1.75rem; border-width: 6px; border-color: rgb(var(--lp-ink) / 0.14); }
+.frame--tablet { border-radius: 1.4rem; border-width: 5px; border-color: rgb(var(--lp-ink) / 0.12); }
+.frame-bar { border-bottom: 1px solid rgb(var(--lp-ink) / 0.07); }
+
+/* Reset everything the editor UI would otherwise pass down to the user's site */
+.site-canvas {
+    background: var(--bg, #fff);
+    color: var(--text, #111);
+    color-scheme: light;
+    font-family: var(--font-body);
+    letter-spacing: normal;
+}
+.site-canvas :deep([data-block-id]) { scroll-margin-top: 1rem; }
+
+.segmented {
+    gap: 0.2rem;
+    border-radius: 0.7rem;
+    background: rgb(var(--lp-ink) / 0.05);
+    padding: 0.2rem;
+}
+.segment {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.5rem;
+    padding: 0.35rem 0.7rem;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgb(var(--lp-muted));
+    transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.segment:hover { color: rgb(var(--lp-fg)); }
+.segment--active { background: rgb(var(--lp-surface)); color: rgb(var(--lp-fg)); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15), 0 0 0 1px rgb(var(--lp-ink) / 0.06); }
+
+.live-pill {
+    display: inline-flex;
+    height: 2.25rem;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 0.7rem;
+    border: 1px solid rgb(16 185 129 / 0.3);
+    background: rgb(16 185 129 / 0.1);
+    padding: 0 0.8rem;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgb(16 185 129);
+    transition: background-color 0.15s;
+}
+.live-pill:hover { background: rgb(16 185 129 / 0.16); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.drawer-backdrop { background: rgb(5 5 10 / 0.45); }
+.drawer { box-shadow: 0 0 60px -10px rgb(0 0 0 / 0.5); }
+.drawer-left-enter-active, .drawer-left-leave-active,
+.drawer-right-enter-active, .drawer-right-leave-active { transition: opacity 0.25s ease; }
+.drawer-left-enter-active .drawer, .drawer-left-leave-active .drawer,
+.drawer-right-enter-active .drawer, .drawer-right-leave-active .drawer { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.drawer-left-enter-from, .drawer-left-leave-to, .drawer-right-enter-from, .drawer-right-leave-to { opacity: 0; }
+.drawer-left-enter-from .drawer, .drawer-left-leave-to .drawer { transform: translateX(-100%); }
+.drawer-right-enter-from .drawer, .drawer-right-leave-to .drawer { transform: translateX(100%); }
+</style>
 
 <style>
 /*
@@ -300,12 +458,6 @@ const fontLink = computed(() => {
 .preview-mobile .grid.sm\:grid-cols-2 {
     grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
 }
-
-.preview-mobile .md\:grid-cols-2,
-.preview-mobile .md\:text-5xl,
-.preview-mobile .md\:text-4xl {
-    /* Reset large text sizes for mobile */
-}
 .preview-mobile h1.text-4xl.md\:text-6xl,
 .preview-mobile h1.text-4xl.md\:text-5xl {
     font-size: 1.875rem !important;
@@ -319,6 +471,26 @@ const fontLink = computed(() => {
 }
 .preview-mobile nav .hidden.md\:flex {
     display: none !important;
+}
+/* Split layouts (e.g. hero image + text) collapse to a single column like on a real phone */
+.preview-mobile .hidden.md\:block,
+.preview-mobile .hidden.md\:flex,
+.preview-mobile .hidden.lg\:block {
+    display: none !important;
+}
+.preview-mobile .md\:w-1\/2,
+.preview-mobile .md\:w-2\/3,
+.preview-mobile .md\:w-1\/3 {
+    width: 100% !important;
+}
+.preview-mobile .md\:text-5xl,
+.preview-mobile .md\:text-6xl {
+    font-size: 2.25rem !important;
+    line-height: 2.5rem !important;
+}
+.preview-mobile .lg\:px-12 {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
 }
 
 /* Tablet: 2 cols max instead of 3+ */

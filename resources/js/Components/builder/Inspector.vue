@@ -4,17 +4,28 @@ import { useEditor } from '@/stores/editor.js';
 import { BLOCK_TYPES } from '@/schema/defaults.js';
 import ImagePicker from '@/Components/builder/ImagePicker.vue';
 import CustomElementEditor from '@/Components/builder/CustomElementEditor.vue';
+import Icon from '@/Components/Landing/Icon.vue';
+import { blockIcons, humanize, singular } from './blockMeta';
+import { useToast } from './useToast';
 import axios from 'axios';
 
 const projectId = inject('projectId');
 
 const editor = useEditor();
+const { notify } = useToast();
 const aiInstruction = ref('');
 const aiLoading = ref(false);
 const aiMode = ref('section'); // 'section' | 'full'
 
 const block = computed(() => editor.selectedBlock);
 const blockDef = computed(() => block.value ? BLOCK_TYPES[block.value.type] : null);
+const index = computed(() => (block.value ? editor.schema.sections.findIndex((s) => s.id === block.value.id) : -1));
+const total = computed(() => editor.schema?.sections?.length || 0);
+const STYLE_KEYS = ['sectionBg', 'sectionText', 'imageRadius', 'imageShadow', 'imageBorder'];
+// Multi-line fields are chosen by name (not length) so the control never swaps mid-typing.
+const LONG_TEXT = ['body', 'description', 'subheading', 'text', 'content', 'answer', 'quote', 'bio', 'message', 'about', 'paragraph'];
+const isLongText = (key) => LONG_TEXT.includes(String(key).toLowerCase());
+const hasImageStyle = computed(() => block.value && (block.value.props.image || block.value.props.imageRadius || block.value.props.imageShadow || block.value.props.imageBorder));
 
 function update(key, value) {
     if (block.value) {
@@ -111,8 +122,9 @@ async function askAi(instruction) {
             editor.setSchema(data.schema);
         }
         aiInstruction.value = '';
+        notify(aiMode.value === 'section' ? 'Section updated with AI' : 'Site updated with AI', 'success');
     } catch (e) {
-        alert(e.response?.data?.error || 'AI edit failed');
+        notify(e.response?.data?.error || 'AI edit failed. Please try again.', 'error');
     } finally {
         aiLoading.value = false;
     }
@@ -192,328 +204,249 @@ const quickActions = computed(() => {
 </script>
 
 <template>
-    <div class="p-4">
-        <div v-if="!block" class="text-center text-gray-400 py-8">
-            <div class="text-3xl mb-2">👆</div>
-            <p class="text-sm">Select a block to edit its properties</p>
+    <div>
+        <!-- Nothing selected -->
+        <div v-if="!block" class="flex flex-col items-center px-6 py-16 text-center">
+            <span class="icon-tile size-12 rounded-2xl"><Icon name="cursorClick" :stroke="1.6" class="size-5" /></span>
+            <p class="mt-4 text-sm font-semibold text-lp-fg">Select a section</p>
+            <p class="mt-1 text-[13px] leading-relaxed text-lp-muted">Click any part of your website, or a layer on the left, to edit its content and style.</p>
+            <div class="mt-8 w-full space-y-2 text-left text-xs text-lp-muted">
+                <div class="ed-heading mb-3 text-center">Shortcuts</div>
+                <div class="flex justify-between"><span>Undo</span><span><kbd class="kbd">⌘</kbd> <kbd class="kbd">Z</kbd></span></div>
+                <div class="flex justify-between"><span>Redo</span><span><kbd class="kbd">⌘</kbd> <kbd class="kbd">⇧</kbd> <kbd class="kbd">Z</kbd></span></div>
+                <div class="flex justify-between"><span>Ask AI</span><span><kbd class="kbd">⌘</kbd> <kbd class="kbd">K</kbd></span></div>
+                <div class="flex justify-between"><span>Delete section</span><kbd class="kbd">Del</kbd></div>
+                <div class="flex justify-between"><span>Deselect</span><kbd class="kbd">Esc</kbd></div>
+            </div>
         </div>
 
         <div v-else>
-            <div class="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-                <span class="text-lg">{{ blockDef?.icon }}</span>
-                <h3 class="font-semibold text-gray-800">{{ blockDef?.label || block.type }}</h3>
-                <button
-                    @click="editor.removeBlock(block.id)"
-                    class="ml-auto text-xs text-red-500 hover:text-red-700"
-                >Delete</button>
+            <!-- Header -->
+            <div class="sticky top-0 z-10 flex items-center gap-3 border-b border-lp-ink/[0.07] bg-lp-bg/95 px-4 py-3 backdrop-blur">
+                <span class="icon-solid size-9 rounded-xl"><Icon :name="blockIcons[block.type] || 'grid'" :stroke="1.7" class="size-[18px]" /></span>
+                <div class="min-w-0 flex-1">
+                    <h3 class="truncate text-sm font-semibold text-lp-fg">{{ blockDef?.label || block.type }}</h3>
+                    <p class="text-[11px] text-lp-subtle">Section {{ index + 1 }} of {{ total }}</p>
+                </div>
+                <div class="flex items-center">
+                    <button type="button" class="ed-icon-btn size-7" title="Move up" :disabled="index <= 0" @click="editor.moveBlock(block.id, -1)"><Icon name="chevronUp" :stroke="2" class="size-4" /></button>
+                    <button type="button" class="ed-icon-btn size-7" title="Move down" :disabled="index >= total - 1" @click="editor.moveBlock(block.id, 1)"><Icon name="chevronDown" :stroke="2" class="size-4" /></button>
+                    <button type="button" class="ed-icon-btn size-7" title="Duplicate" @click="editor.duplicateBlock(block.id)"><Icon name="duplicate" :stroke="1.7" class="size-4" /></button>
+                    <button type="button" class="ed-icon-btn ed-icon-btn--danger size-7" title="Delete section" @click="editor.removeBlock(block.id)"><Icon name="trash" :stroke="1.7" class="size-4" /></button>
+                </div>
             </div>
 
-            <!-- Section Colors -->
-            <div class="mb-4 pb-4 border-b border-gray-100 space-y-3">
-                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Section Colors</label>
-
-                <!-- Background -->
-                <div class="space-y-1">
-                    <label class="text-[10px] font-medium text-gray-400">Background</label>
-                    <div class="flex items-center gap-2">
+            <div class="space-y-6 p-4">
+                <!-- AI quick actions -->
+                <section class="ai-card rounded-2xl p-3.5">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="flex items-center gap-1.5 text-[13px] font-semibold text-lp-fg"><Icon name="sparkles" :stroke="1.8" class="size-4 text-lp-accent" />AI assist</span>
+                        <div class="flex rounded-lg bg-lp-ink/[0.06] p-0.5 text-[11px] font-medium">
+                            <button type="button" :class="['rounded-md px-2 py-1 transition', aiMode === 'section' ? 'bg-lp-surface text-lp-fg shadow-sm' : 'text-lp-muted hover:text-lp-fg']" @click="aiMode = 'section'">This section</button>
+                            <button type="button" :class="['rounded-md px-2 py-1 transition', aiMode === 'full' ? 'bg-lp-surface text-lp-fg shadow-sm' : 'text-lp-muted hover:text-lp-fg']" @click="aiMode = 'full'">Full site</button>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-1.5">
+                        <button
+                            v-for="action in quickActions"
+                            :key="action.label"
+                            type="button"
+                            :disabled="aiLoading"
+                            class="ed-option !rounded-full !px-2.5 !py-1 !text-[11px] disabled:opacity-40"
+                            @click="askAi(action.label)"
+                        >{{ action.label }}</button>
+                    </div>
+                    <div class="mt-3 flex gap-2">
                         <input
-                            type="color"
-                            :value="block.props.sectionBg || '#ffffff'"
-                            @input="update('sectionBg', $event.target.value)"
-                            class="w-10 h-8 rounded cursor-pointer border border-gray-200"
-                        />
-                        <input
+                            v-model="aiInstruction"
                             type="text"
-                            :value="block.props.sectionBg || ''"
-                            @input="update('sectionBg', $event.target.value)"
-                            placeholder="Theme default"
-                            class="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500"
+                            :placeholder="aiMode === 'section' ? `Tell AI how to change this ${(blockDef?.label || block.type).toLowerCase()}…` : 'Tell AI how to change the site…'"
+                            class="ed-input ed-input-sm flex-1"
+                            :disabled="aiLoading"
+                            @keydown.enter="askAi()"
                         />
-                        <button
-                            v-if="block.props.sectionBg"
-                            @click="update('sectionBg', '')"
-                            class="text-xs text-gray-400 hover:text-red-500"
-                            title="Reset"
-                        >&#x2715;</button>
-                    </div>
-                </div>
-
-                <!-- Text Color -->
-                <div class="space-y-1">
-                    <label class="text-[10px] font-medium text-gray-400">Text Color</label>
-                    <div class="flex items-center gap-2">
-                        <input
-                            type="color"
-                            :value="block.props.sectionText || '#1a1a1a'"
-                            @input="update('sectionText', $event.target.value)"
-                            class="w-10 h-8 rounded cursor-pointer border border-gray-200"
-                        />
-                        <input
-                            type="text"
-                            :value="block.props.sectionText || ''"
-                            @input="update('sectionText', $event.target.value)"
-                            placeholder="Theme default"
-                            class="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                        />
-                        <button
-                            v-if="block.props.sectionText"
-                            @click="update('sectionText', '')"
-                            class="text-xs text-gray-400 hover:text-red-500"
-                            title="Reset"
-                        >&#x2715;</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Image Styling (show when block has an image set) -->
-            <div v-if="block.props.image || block.props.imageRadius || block.props.imageShadow || block.props.imageBorder" class="mb-4 pb-4 border-b border-gray-100 space-y-3">
-                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Image Style</label>
-                <div class="grid grid-cols-3 gap-2">
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-medium text-gray-400">Radius</label>
-                        <select :value="block.props.imageRadius || ''" @change="update('imageRadius', $event.target.value)" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
-                            <option value="">Default</option>
-                            <option value="none">None</option>
-                            <option value="sm">Small</option>
-                            <option value="md">Medium</option>
-                            <option value="lg">Large</option>
-                            <option value="xl">XL</option>
-                            <option value="full">Full</option>
-                        </select>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-medium text-gray-400">Shadow</label>
-                        <select :value="block.props.imageShadow || ''" @change="update('imageShadow', $event.target.value)" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
-                            <option value="">None</option>
-                            <option value="sm">Small</option>
-                            <option value="md">Medium</option>
-                            <option value="lg">Large</option>
-                            <option value="xl">XL</option>
-                        </select>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-medium text-gray-400">Border</label>
-                        <select :value="block.props.imageBorder || ''" @change="update('imageBorder', $event.target.value)" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
-                            <option value="">None</option>
-                            <option value="thin">Thin</option>
-                            <option value="thick">Thick</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ===== CUSTOM BLOCK ELEMENT EDITOR ===== -->
-            <div v-if="block.type === 'custom'" class="space-y-3 mb-4 pb-4 border-b border-gray-100">
-                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Layout</label>
-                <div class="grid grid-cols-3 gap-2">
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-medium text-gray-400">Columns</label>
-                        <select :value="block.props.columns || 1" @change="update('columns', Number($event.target.value))" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
-                            <option :value="1">1</option>
-                            <option :value="2">2</option>
-                            <option :value="3">3</option>
-                            <option :value="4">4</option>
-                        </select>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-medium text-gray-400">Gap</label>
-                        <select :value="block.props.gap || 'md'" @change="update('gap', $event.target.value)" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
-                            <option value="sm">Small</option>
-                            <option value="md">Medium</option>
-                            <option value="lg">Large</option>
-                            <option value="xl">XL</option>
-                        </select>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-medium text-gray-400">Padding</label>
-                        <select :value="block.props.padding || 'lg'" @change="update('padding', $event.target.value)" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg">
-                            <option value="sm">Small</option>
-                            <option value="md">Medium</option>
-                            <option value="lg">Large</option>
-                            <option value="xl">XL</option>
-                        </select>
-                    </div>
-                </div>
-
-                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-4 block">Elements</label>
-                <div class="space-y-2">
-                    <CustomElementEditor
-                        v-for="(el, i) in (block.props.elements || [])"
-                        :key="i"
-                        :element="el"
-                        :index="i"
-                        @update="updateElement"
-                        @remove="removeElement"
-                    />
-                </div>
-
-                <!-- Add element -->
-                <div class="relative">
-                    <button
-                        @click="showAddElement = !showAddElement"
-                        class="w-full px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
-                    >+ Add Element</button>
-                    <div v-if="showAddElement" class="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-xl shadow-xl z-30 overflow-hidden">
-                        <button
-                            v-for="et in elementTypeList"
-                            :key="et.type"
-                            @click="addElement(et.type)"
-                            class="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 transition-colors text-left"
-                        >
-                            <span class="w-5 text-center">{{ et.icon }}</span>
-                            <span class="font-medium text-gray-700">{{ et.label }}</span>
+                        <button type="button" class="btn btn-primary h-8 shrink-0 !rounded-lg px-3 text-xs" :disabled="aiLoading || !aiInstruction.trim()" @click="askAi()">
+                            <svg v-if="aiLoading" class="size-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg>
+                            {{ aiLoading ? 'Working' : 'Apply' }}
                         </button>
                     </div>
-                </div>
-            </div>
+                </section>
 
-            <div v-if="block.type !== 'custom'" class="space-y-4">
-                <!-- String props -->
-                <template v-for="(value, key) in block.props" :key="key">
-                    <!-- Skip styled props (shown above), arrays and objects (handled separately) -->
-                    <div v-if="['sectionBg','sectionText','imageRadius','imageShadow','imageBorder'].includes(key)" class="hidden"></div>
-                    <div v-else-if="typeof value === 'string'" class="space-y-1">
-                        <label class="text-xs font-medium text-gray-500 capitalize">{{ key }}</label>
-                        <!-- Image props -->
-                        <ImagePicker
-                            v-if="isImageProp(key)"
-                            :model-value="value"
-                            :project-id="projectId"
-                            @update:model-value="update(key, $event)"
-                        />
-                        <textarea
-                            v-else-if="key === 'body' || key === 'description'"
-                            :value="value"
-                            @input="update(key, $event.target.value)"
-                            rows="3"
-                            class="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                        ></textarea>
-                        <input
-                            v-else-if="key.toLowerCase().includes('color')"
-                            type="color"
-                            :value="value"
-                            @input="update(key, $event.target.value)"
-                            class="w-full h-8 rounded cursor-pointer"
-                        />
-                        <input
-                            v-else
-                            type="text"
-                            :value="value"
-                            @input="update(key, $event.target.value)"
-                            class="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                        />
+                <!-- Custom block layout & elements -->
+                <section v-if="block.type === 'custom'" class="space-y-4">
+                    <h4 class="ed-heading">Layout</h4>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="ed-label">Columns</label>
+                            <select :value="block.props.columns || 1" class="ed-select ed-input-sm" @change="update('columns', Number($event.target.value))">
+                                <option :value="1">1</option><option :value="2">2</option><option :value="3">3</option><option :value="4">4</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="ed-label">Gap</label>
+                            <select :value="block.props.gap || 'md'" class="ed-select ed-input-sm" @change="update('gap', $event.target.value)">
+                                <option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option><option value="xl">XL</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="ed-label">Padding</label>
+                            <select :value="block.props.padding || 'lg'" class="ed-select ed-input-sm" @change="update('padding', $event.target.value)">
+                                <option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option><option value="xl">XL</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <!-- Number props -->
-                    <div v-else-if="typeof value === 'number'" class="space-y-1">
-                        <label class="text-xs font-medium text-gray-500 capitalize">{{ key }}</label>
-                        <input
-                            type="number"
-                            :value="value"
-                            @input="update(key, Number($event.target.value))"
-                            class="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                            min="1"
-                            max="6"
-                        />
-                    </div>
-
-                    <!-- Array of objects (links, items, images) -->
-                    <div v-else-if="Array.isArray(value) && value.length && typeof value[0] === 'object'" class="space-y-2">
-                        <label class="text-xs font-medium text-gray-500 capitalize">{{ key }}</label>
-                        <div
-                            v-for="(item, i) in value"
+                    <h4 class="ed-heading pt-2">Elements</h4>
+                    <div class="space-y-2">
+                        <CustomElementEditor
+                            v-for="(el, i) in (block.props.elements || [])"
                             :key="i"
-                            class="p-2 bg-gray-50 rounded-lg space-y-1 relative group"
-                        >
-                            <button
-                                @click="removeArrayItem(key, i)"
-                                class="absolute top-1 right-1 text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100"
-                            >✕</button>
-                            <div v-for="(val, field) in item" :key="field">
-                                <label class="text-[10px] text-gray-400 capitalize">{{ field }}</label>
-                                <ImagePicker
-                                    v-if="isImageProp(field)"
-                                    :model-value="val"
-                                    :project-id="projectId"
-                                    @update:model-value="updateNested(key, i, field, $event)"
-                                />
-                                <input
-                                    v-else
-                                    type="text"
-                                    :value="val"
-                                    @input="updateNested(key, i, field, $event.target.value)"
-                                    :placeholder="field"
-                                    class="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-blue-500"
-                                />
+                            :element="el"
+                            :index="i"
+                            @update="updateElement"
+                            @remove="removeElement"
+                        />
+                    </div>
+                    <div class="relative">
+                        <button type="button" class="btn btn-ghost h-9 w-full text-xs" @click="showAddElement = !showAddElement"><Icon name="plus" :stroke="2" class="size-3.5" />Add element</button>
+                        <div v-if="showAddElement" class="menu-pop absolute bottom-full left-0 right-0 z-30 mb-2 grid grid-cols-2 gap-1 p-1.5">
+                            <button v-for="et in elementTypeList" :key="et.type" type="button" class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-lp-text transition hover:bg-lp-ink/[0.06]" @click="addElement(et.type)">
+                                <span class="w-4 text-center text-lp-muted">{{ et.icon }}</span>{{ et.label }}
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Content fields -->
+                <section v-if="block.type !== 'custom'" class="space-y-4">
+                    <h4 class="ed-heading">Content</h4>
+                    <template v-for="(value, key) in block.props" :key="key">
+                        <template v-if="STYLE_KEYS.includes(key)" />
+
+                        <!-- Text / image / colour -->
+                        <div v-else-if="typeof value === 'string'">
+                            <label class="ed-label">{{ humanize(key) }}</label>
+                            <ImagePicker v-if="isImageProp(key)" :model-value="value" :project-id="projectId" @update:model-value="update(key, $event)" />
+                            <textarea v-else-if="isLongText(key)" :value="value" rows="3" class="ed-textarea" @input="update(key, $event.target.value)"></textarea>
+                            <div v-else-if="key.toLowerCase().includes('color')" class="flex items-center gap-2">
+                                <input type="color" :value="value" class="ed-color" @input="update(key, $event.target.value)" />
+                                <input type="text" :value="value" class="ed-input font-mono" @input="update(key, $event.target.value)" />
+                            </div>
+                            <input v-else type="text" :value="value" class="ed-input" @input="update(key, $event.target.value)" />
+                        </div>
+
+                        <!-- Numbers -->
+                        <div v-else-if="typeof value === 'number'">
+                            <label class="ed-label">{{ humanize(key) }}</label>
+                            <input type="number" :value="value" min="1" max="6" class="ed-input" @input="update(key, Number($event.target.value))" />
+                        </div>
+
+                        <!-- Lists of objects (links, features, plans…) -->
+                        <div v-else-if="Array.isArray(value) && value.length && typeof value[0] === 'object'">
+                            <div class="mb-2 flex items-center justify-between">
+                                <label class="ed-label !mb-0">{{ humanize(key) }} <span class="text-lp-subtle">· {{ value.length }}</span></label>
+                            </div>
+                            <div class="space-y-2">
+                                <details v-for="(item, i) in value" :key="i" class="ed-item group/item" :open="value.length <= 3">
+                                    <summary class="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium text-lp-text">
+                                        <Icon name="chevronDown" :stroke="2" class="size-3.5 -rotate-90 text-lp-subtle transition-transform group-open/item:rotate-0" />
+                                        <span class="min-w-0 flex-1 truncate">{{ item.title || item.label || item.name || item.question || item.value || item.alt || `${singular(key)} ${i + 1}` }}</span>
+                                        <button type="button" class="ed-icon-btn ed-icon-btn--danger size-6" :title="`Remove ${singular(key)}`" @click.prevent="removeArrayItem(key, i)"><Icon name="xMark" :stroke="2" class="size-3.5" /></button>
+                                    </summary>
+                                    <div class="space-y-2.5 border-t border-lp-ink/[0.06] px-3 pb-3 pt-2.5">
+                                        <div v-for="(val, field) in item" :key="field">
+                                            <label class="ed-label !text-[11px]">{{ humanize(field) }}</label>
+                                            <ImagePicker v-if="isImageProp(field)" :model-value="val" :project-id="projectId" @update:model-value="updateNested(key, i, field, $event)" />
+                                            <input v-else type="text" :value="val" :placeholder="humanize(field)" class="ed-input ed-input-sm" @input="updateNested(key, i, field, $event.target.value)" />
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                            <button type="button" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-lp-accent hover:opacity-80" @click="addArrayItem(key, Object.fromEntries(Object.keys(value[0] || {}).map(k => [k, ''])))">
+                                <Icon name="plus" :stroke="2.2" class="size-3.5" />Add {{ singular(key) }}
+                            </button>
+                        </div>
+
+                        <!-- Lists of strings -->
+                        <div v-else-if="Array.isArray(value) && (!value.length || typeof value[0] === 'string')">
+                            <label class="ed-label">{{ humanize(key) }}</label>
+                            <div class="flex flex-wrap gap-1.5">
+                                <span v-for="v in value" :key="v" class="chip">{{ v }}</span>
+                                <span v-if="!value.length" class="text-xs text-lp-subtle">None</span>
                             </div>
                         </div>
-                        <button
-                            @click="addArrayItem(key, Object.fromEntries(Object.keys(value[0] || {}).map(k => [k, ''])))"
-                            class="text-xs text-blue-600 hover:text-blue-800"
-                        >+ Add {{ key.slice(0, -1) }}</button>
+                    </template>
+                </section>
+
+                <!-- Style -->
+                <details class="group/style border-t border-lp-ink/[0.07] pt-5" open>
+                    <summary class="flex cursor-pointer list-none items-center justify-between">
+                        <h4 class="ed-heading">Style</h4>
+                        <Icon name="chevronDown" :stroke="2" class="size-4 text-lp-subtle transition-transform group-open/style:rotate-180" />
+                    </summary>
+                    <div class="mt-4 space-y-4">
+                        <div>
+                            <label class="ed-label">Background</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" :value="block.props.sectionBg || '#ffffff'" class="ed-color" @input="update('sectionBg', $event.target.value)" />
+                                <input type="text" :value="block.props.sectionBg || ''" placeholder="Theme default" class="ed-input font-mono" @input="update('sectionBg', $event.target.value)" />
+                                <button v-if="block.props.sectionBg" type="button" class="ed-icon-btn" title="Reset to theme" @click="update('sectionBg', '')"><Icon name="undo" :stroke="1.8" class="size-4" /></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="ed-label">Text color</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" :value="block.props.sectionText || '#1a1a1a'" class="ed-color" @input="update('sectionText', $event.target.value)" />
+                                <input type="text" :value="block.props.sectionText || ''" placeholder="Theme default" class="ed-input font-mono" @input="update('sectionText', $event.target.value)" />
+                                <button v-if="block.props.sectionText" type="button" class="ed-icon-btn" title="Reset to theme" @click="update('sectionText', '')"><Icon name="undo" :stroke="1.8" class="size-4" /></button>
+                            </div>
+                        </div>
+
+                        <div v-if="hasImageStyle" class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="ed-label">Image radius</label>
+                                <select :value="block.props.imageRadius || ''" class="ed-select ed-input-sm" @change="update('imageRadius', $event.target.value)">
+                                    <option value="">Default</option><option value="none">None</option><option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option><option value="xl">XL</option><option value="full">Full</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="ed-label">Shadow</label>
+                                <select :value="block.props.imageShadow || ''" class="ed-select ed-input-sm" @change="update('imageShadow', $event.target.value)">
+                                    <option value="">None</option><option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option><option value="xl">XL</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="ed-label">Border</label>
+                                <select :value="block.props.imageBorder || ''" class="ed-select ed-input-sm" @change="update('imageBorder', $event.target.value)">
+                                    <option value="">None</option><option value="thin">Thin</option><option value="thick">Thick</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-
-                    <!-- Array of strings (fields) -->
-                    <div v-else-if="Array.isArray(value) && (!value.length || typeof value[0] === 'string')" class="space-y-1">
-                        <label class="text-xs font-medium text-gray-500 capitalize">{{ key }}</label>
-                        <div class="text-xs text-gray-400">{{ value.join(', ') }}</div>
-                    </div>
-                </template>
-            </div>
-
-            <!-- AI Assist -->
-            <div class="mt-6 pt-4 border-t border-gray-100">
-                <div class="flex items-center justify-between mb-3">
-                    <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">AI Assist</label>
-                    <div class="flex rounded-md border border-gray-200 overflow-hidden">
-                        <button
-                            @click="aiMode = 'section'"
-                            class="px-2 py-0.5 text-[10px] font-medium transition-colors"
-                            :class="aiMode === 'section' ? 'bg-purple-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
-                        >This Section</button>
-                        <button
-                            @click="aiMode = 'full'"
-                            class="px-2 py-0.5 text-[10px] font-medium transition-colors"
-                            :class="aiMode === 'full' ? 'bg-purple-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
-                        >Full Site</button>
-                    </div>
-                </div>
-
-                <!-- Quick Actions -->
-                <div class="flex flex-wrap gap-1.5 mb-3">
-                    <button
-                        v-for="action in quickActions"
-                        :key="action.label"
-                        @click="askAi(action.label)"
-                        :disabled="aiLoading"
-                        class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 transition-all disabled:opacity-40"
-                    >
-                        <span>{{ action.icon }}</span>
-                        {{ action.label }}
-                    </button>
-                </div>
-
-                <!-- Custom instruction -->
-                <div class="flex gap-2">
-                    <input
-                        v-model="aiInstruction"
-                        type="text"
-                        :placeholder="aiMode === 'section' ? `Edit this ${block.type} section...` : 'Edit the full site...'"
-                        class="flex-1 px-3 py-2 text-xs border border-gray-200 rounded-lg focus:ring-1 focus:ring-purple-500 focus:border-purple-300"
-                        @keydown.enter="askAi()"
-                        :disabled="aiLoading"
-                    />
-                    <button
-                        @click="askAi()"
-                        :disabled="aiLoading || !aiInstruction.trim()"
-                        class="px-3 py-2 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center gap-1.5 shrink-0"
-                    >
-                        <svg v-if="aiLoading" class="animate-spin size-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" /></svg>
-                        {{ aiLoading ? 'Working...' : 'Ask AI' }}
-                    </button>
-                </div>
+                </details>
             </div>
         </div>
     </div>
 </template>
+
+<style scoped>
+.ai-card {
+    border: 1px solid rgb(139 92 246 / 0.25);
+    background: linear-gradient(180deg, rgb(139 92 246 / 0.09), rgb(139 92 246 / 0.02));
+}
+.menu-pop {
+    border-radius: 0.9rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.1);
+    background: rgb(var(--lp-surface));
+    box-shadow: 0 20px 50px -12px rgb(0 0 0 / 0.35);
+}
+.kbd {
+    border-radius: 0.3rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.15);
+    padding: 0 0.3rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px;
+}
+summary::-webkit-details-marker { display: none; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+</style>

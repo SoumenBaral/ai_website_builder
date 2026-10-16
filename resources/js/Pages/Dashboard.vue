@@ -1,301 +1,357 @@
 <script setup>
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import Icon from '@/Components/Landing/Icon.vue';
+import AppMenu from '@/Components/App/AppMenu.vue';
+import AppModal from '@/Components/App/AppModal.vue';
+import { useCreateProject } from '@/Components/App/useCreateProject';
+import QuickStart from '@/Components/Dashboard/QuickStart.vue';
+import StatCard from '@/Components/Dashboard/StatCard.vue';
+import ProjectCard from '@/Components/Dashboard/ProjectCard.vue';
+import CreateProjectModal from '@/Components/Dashboard/CreateProjectModal.vue';
+import { compactNumber } from '@/Components/Dashboard/format';
 
 const props = defineProps({
-    projects: Array,
+    projects: { type: Array, default: () => [] },
 });
 
-const showModal = ref(false);
-const searchQuery = ref('');
-const form = useForm({
-    name: '',
-    description: '',
+const page = usePage();
+const user = computed(() => page.props.auth.user);
+const usage = computed(() => page.props.usage);
+const { open: createOpen, openCreate } = useCreateProject();
+
+/* ---------- Greeting & summary ---------- */
+const firstName = computed(() => (user.value?.name || '').split(' ')[0]);
+const greeting = computed(() => {
+    const h = new Date().getHours();
+    return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+});
+const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+const live = computed(() => props.projects.filter((p) => p.status === 'published'));
+const drafts = computed(() => props.projects.filter((p) => p.status !== 'published'));
+const totalViews = computed(() => props.projects.reduce((sum, p) => sum + (p.views || 0), 0));
+const totalPages = computed(() => props.projects.reduce((sum, p) => sum + (p.pages_count || 0), 0));
+const usagePct = computed(() => (usage.value ? (usage.value.used / usage.value.limit) * 100 : 0));
+const resetDate = (() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+})();
+
+/* ---------- Filter / search / sort ---------- */
+const filter = ref('all');
+const search = ref('');
+const sort = ref('updated');
+const searchInput = ref(null);
+
+const filters = computed(() => [
+    { key: 'all', label: 'All', count: props.projects.length },
+    { key: 'live', label: 'Live', count: live.value.length },
+    { key: 'draft', label: 'Drafts', count: drafts.value.length },
+]);
+const sorts = [
+    { key: 'updated', label: 'Last edited' },
+    { key: 'name', label: 'Name (A–Z)' },
+    { key: 'views', label: 'Most viewed' },
+];
+const sortLabel = computed(() => sorts.find((s) => s.key === sort.value).label);
+
+const visible = computed(() => {
+    let list = filter.value === 'live' ? live.value : filter.value === 'draft' ? drafts.value : props.projects;
+    const q = search.value.trim().toLowerCase();
+    if (q) list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q));
+    const sorted = [...list];
+    if (sort.value === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sort.value === 'views') sorted.sort((a, b) => (b.views || 0) - (a.views || 0));
+    else sorted.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    return sorted;
 });
 
-const filteredProjects = computed(() => {
-    if (!searchQuery.value.trim()) return props.projects || [];
-    const q = searchQuery.value.toLowerCase();
-    return (props.projects || []).filter(p =>
-        p.name.toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q)
-    );
-});
+function resetFilters() {
+    filter.value = 'all';
+    search.value = '';
+}
 
-const publishedCount = computed(() => (props.projects || []).filter(p => p.status === 'published').length);
-const draftCount = computed(() => (props.projects || []).filter(p => p.status !== 'published').length);
-
-function createProject() {
-    form.post(route('projects.store'), {
-        onSuccess: () => {
-            showModal.value = false;
-            form.reset();
-        },
+/* ---------- Delete ---------- */
+const toDelete = ref(null);
+const deleteOpen = ref(false);
+const deleting = ref(false);
+function askDelete(project) {
+    toDelete.value = project;
+    deleteOpen.value = true;
+}
+function confirmDelete() {
+    deleting.value = true;
+    router.delete(route('projects.destroy', toDelete.value.id), {
+        preserveScroll: true,
+        onFinish: () => { deleting.value = false; deleteOpen.value = false; },
     });
 }
 
-function deleteProject(project) {
-    if (confirm(`Delete "${project.name}"? This cannot be undone.`)) {
-        router.delete(route('projects.destroy', project.id));
+/* ---------- Keyboard shortcuts: "/" search, "n" new website ---------- */
+function onKey(e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const el = document.activeElement;
+    const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+    if (typing || createOpen.value || deleteOpen.value) return;
+    if (e.key === '/' && searchInput.value) { e.preventDefault(); searchInput.value.focus(); }
+    else if (e.key.toLowerCase() === 'n') { e.preventDefault(); openCreate(); }
+}
+
+onMounted(() => {
+    window.addEventListener('keydown', onKey);
+    // Arriving from the sidebar "New website" button on another page
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('new')) {
+        createOpen.value = true;
+        url.searchParams.delete('new');
+        window.history.replaceState(window.history.state, '', url);
     }
-}
-
-function timeAgo(date) {
-    if (!date) return '';
-    const d = new Date(date);
-    const now = new Date();
-    const diff = Math.floor((now - d) / 1000);
-    if (diff < 60) return 'just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-const gradients = [
-    'from-indigo-500 to-violet-500',
-    'from-violet-500 to-purple-500',
-    'from-blue-500 to-indigo-500',
-    'from-emerald-500 to-teal-500',
-    'from-rose-500 to-pink-500',
-    'from-amber-500 to-orange-500',
-    'from-cyan-500 to-blue-500',
-    'from-fuchsia-500 to-pink-500',
-];
-
-function getGradient(index) {
-    return gradients[index % gradients.length];
-}
+});
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', onKey);
+    createOpen.value = false;
+});
 </script>
 
 <template>
     <Head title="Dashboard" />
 
     <AuthenticatedLayout>
-        <template #header>
-            <div class="flex items-center justify-between">
+        <div class="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-10 lg:pt-10">
+            <!-- Header -->
+            <div class="intro flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h2 class="text-2xl font-bold text-gray-900">My Projects</h2>
-                    <p class="text-sm text-gray-500 mt-0.5">Manage and edit your AI-generated websites</p>
+                    <p class="text-sm text-lp-subtle">{{ today }}</p>
+                    <h1 class="mt-1 text-[1.9rem] font-bold leading-tight tracking-[-0.03em] text-lp-fg sm:text-[2.3rem]">
+                        {{ greeting }}, <span class="serif text-gradient pr-1 text-[1.08em]">{{ firstName }}.</span>
+                    </h1>
+                    <p v-if="projects.length" class="mt-1.5 text-[15px] text-lp-muted">
+                        You have {{ projects.length }} {{ projects.length === 1 ? 'website' : 'websites' }}<template v-if="live.length">, {{ live.length }} live</template>.
+                    </p>
                 </div>
-                <button
-                    @click="showModal = true"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all duration-200"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    New Project
+                <button v-if="projects.length" type="button" class="btn btn-primary h-11 self-start px-5 text-sm sm:self-auto" @click="openCreate">
+                    <Icon name="plus" :stroke="2.2" class="size-4" /> New website
+                    <kbd class="kbd ml-1 hidden sm:inline-flex">N</kbd>
                 </button>
             </div>
-        </template>
 
-        <div class="py-8">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-
-                <!-- Stats bar -->
-                <div v-if="projects?.length" class="grid grid-cols-3 gap-4 mb-8">
-                    <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                        <div class="text-sm font-medium text-gray-500">Total Projects</div>
-                        <div class="text-3xl font-bold text-gray-900 mt-1">{{ projects.length }}</div>
-                    </div>
-                    <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                        <div class="text-sm font-medium text-gray-500">Published</div>
-                        <div class="text-3xl font-bold text-emerald-600 mt-1">{{ publishedCount }}</div>
-                    </div>
-                    <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                        <div class="text-sm font-medium text-gray-500">Drafts</div>
-                        <div class="text-3xl font-bold text-gray-400 mt-1">{{ draftCount }}</div>
-                    </div>
-                </div>
-
-                <!-- Search bar -->
-                <div v-if="projects?.length > 2" class="mb-6">
-                    <div class="relative max-w-md">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-gray-400"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
-                        <input
-                            v-model="searchQuery"
-                            type="text"
-                            placeholder="Search projects..."
-                            class="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-shadow bg-white"
-                        />
-                    </div>
-                </div>
-
-                <!-- Empty state -->
-                <div v-if="!projects?.length" class="text-center py-24 bg-white rounded-3xl border border-gray-100 shadow-sm">
-                    <div class="relative mx-auto w-24 h-24 mb-6">
-                        <div class="absolute inset-0 rounded-3xl bg-gradient-to-br from-indigo-100 to-violet-100 animate-pulse"></div>
-                        <div class="relative flex items-center justify-center h-full">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-10 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>
+            <!-- Empty state: the prompt *is* the onboarding -->
+            <div v-if="!projects.length" class="intro mt-8" style="--d: 80ms">
+                <QuickStart hero />
+                <div class="mt-6 grid gap-4 sm:grid-cols-3">
+                    <div v-for="(s, i) in [
+                        { icon: 'chat', title: 'Describe it', text: 'One sentence about your business or idea.' },
+                        { icon: 'sparkles', title: 'AI builds it', text: 'Layout, copy, colors and images in seconds.' },
+                        { icon: 'rocket', title: 'Publish it', text: 'Polish in the editor, then go live in one click.' },
+                    ]" :key="s.title" class="card flex gap-3.5 p-5">
+                        <span class="icon-tile size-10 rounded-xl"><Icon :name="s.icon" :stroke="1.6" class="size-[18px]" /></span>
+                        <div>
+                            <div class="text-sm font-semibold text-lp-fg"><span class="mr-1.5 text-lp-subtle">0{{ i + 1 }}</span>{{ s.title }}</div>
+                            <p class="mt-0.5 text-[13px] leading-relaxed text-lp-muted">{{ s.text }}</p>
                         </div>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-2">Create your first website</h3>
-                    <p class="text-gray-500 mb-8 max-w-sm mx-auto">Describe what you want and AI will build a complete, professional website in seconds.</p>
-                    <button
-                        @click="showModal = true"
-                        class="inline-flex items-center gap-2 px-7 py-3 text-white bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xl font-semibold shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all duration-200"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                        Create Your First Project
-                    </button>
-                </div>
-
-                <!-- No search results -->
-                <div v-else-if="filteredProjects.length === 0" class="text-center py-16 text-gray-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="size-12 mx-auto mb-3 text-gray-300"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
-                    <p class="font-medium">No projects match "{{ searchQuery }}"</p>
-                </div>
-
-                <!-- Project grid -->
-                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div
-                        v-for="(project, index) in filteredProjects"
-                        :key="project.id"
-                        class="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl hover:shadow-indigo-500/[0.04] hover:-translate-y-1 transition-all duration-300"
-                    >
-                        <!-- Card header with gradient -->
-                        <div class="relative h-36 overflow-hidden" :class="`bg-gradient-to-br ${getGradient(index)}`">
-                            <!-- Pattern overlay -->
-                            <div class="absolute inset-0 opacity-10" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
-
-                            <!-- Project initial -->
-                            <div class="absolute inset-0 flex items-center justify-center">
-                                <span class="text-5xl font-bold text-white/30">{{ project.name.charAt(0).toUpperCase() }}</span>
-                            </div>
-
-                            <!-- Status badge -->
-                            <div class="absolute top-3 right-3">
-                                <span
-                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full backdrop-blur-sm"
-                                    :class="project.status === 'published'
-                                        ? 'bg-white/20 text-white'
-                                        : 'bg-black/10 text-white/80'"
-                                >
-                                    <span class="size-1.5 rounded-full" :class="project.status === 'published' ? 'bg-green-300' : 'bg-white/50'"></span>
-                                    {{ project.status === 'published' ? 'Live' : 'Draft' }}
-                                </span>
-                            </div>
-
-                            <!-- Quick open on hover -->
-                            <a
-                                :href="route('editor.show', project.id)"
-                                class="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-all duration-300"
-                            >
-                                <div class="flex items-center gap-2 px-5 py-2.5 bg-white rounded-xl text-sm font-semibold text-gray-900 shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg>
-                                    Open Editor
-                                </div>
-                            </a>
-                        </div>
-
-                        <!-- Card body -->
-                        <div class="p-5">
-                            <h3 class="font-bold text-gray-900 truncate text-base">{{ project.name }}</h3>
-                            <p v-if="project.description" class="text-sm text-gray-400 mt-1 line-clamp-2 leading-relaxed">{{ project.description }}</p>
-                            <p v-else class="text-sm text-gray-300 mt-1 italic">No description</p>
-
-                            <!-- Footer -->
-                            <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
-                                <div class="flex items-center gap-4">
-                                    <a
-                                        v-if="project.status === 'published'"
-                                        :href="`/s/${project.slug}`"
-                                        target="_blank"
-                                        class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-                                        View Live
-                                    </a>
-                                    <span class="text-[11px] text-gray-300">{{ timeAgo(project.updated_at) }}</span>
-                                </div>
-                                <button
-                                    @click="deleteProject(project)"
-                                    class="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-                                    title="Delete project"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- New project card -->
-                    <button
-                        @click="showModal = true"
-                        class="group flex flex-col items-center justify-center bg-white rounded-2xl border-2 border-dashed border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all duration-300 min-h-[280px]"
-                    >
-                        <div class="size-14 rounded-2xl bg-gray-100 group-hover:bg-indigo-100 flex items-center justify-center transition-colors mb-4">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6 text-gray-400 group-hover:text-indigo-500 transition-colors"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                        </div>
-                        <span class="text-sm font-semibold text-gray-400 group-hover:text-indigo-600 transition-colors">New Project</span>
-                    </button>
                 </div>
             </div>
-        </div>
 
-        <!-- Create Project Modal -->
-        <Teleport to="body">
-            <Transition
-                enter-active-class="transition duration-200 ease-out"
-                enter-from-class="opacity-0"
-                enter-to-class="opacity-100"
-                leave-active-class="transition duration-150 ease-in"
-                leave-from-class="opacity-100"
-                leave-to-class="opacity-0"
-            >
-                <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center">
-                    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showModal = false"></div>
-                    <div class="relative bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
-                        <div class="flex items-center gap-3 mb-6">
-                            <div class="size-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="white" class="size-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            <template v-else>
+                <!-- Stats -->
+                <div class="intro mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4" style="--d: 60ms">
+                    <StatCard label="Websites" :value="projects.length" icon="globe" :hint="`${totalPages} ${totalPages === 1 ? 'page' : 'pages'} in total`" />
+                    <StatCard label="Live" :value="live.length" icon="rocket" :hint="drafts.length ? `${drafts.length} in draft` : 'Everything is published'" />
+                    <StatCard label="Views · 30 days" :value="compactNumber(totalViews)" icon="chart" :hint="live.length ? 'Across your live sites' : 'Publish to start tracking'" />
+                    <StatCard v-if="usage" label="AI generations" :value="`${usage.used}/${usage.limit}`" icon="sparkles" :progress="usagePct" :hint="`Resets ${resetDate}`" />
+                </div>
+
+                <!-- Quick start -->
+                <div class="intro mt-6" style="--d: 120ms">
+                    <QuickStart />
+                </div>
+
+                <!-- Projects -->
+                <section class="intro mt-12" style="--d: 180ms" aria-labelledby="projects-heading">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <h2 id="projects-heading" class="text-xl font-semibold tracking-tight text-lp-fg">Your websites</h2>
+
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                            <!-- Segmented filter -->
+                            <div class="segmented" role="tablist" aria-label="Filter websites">
+                                <button
+                                    v-for="f in filters"
+                                    :key="f.key"
+                                    type="button"
+                                    role="tab"
+                                    :aria-selected="filter === f.key"
+                                    :class="['segment', filter === f.key && 'segment--active']"
+                                    @click="filter = f.key"
+                                >
+                                    {{ f.label }} <span class="segment-count">{{ f.count }}</span>
+                                </button>
                             </div>
-                            <div>
-                                <h3 class="text-lg font-bold text-gray-900">New Project</h3>
-                                <p class="text-xs text-gray-500">Create a new AI-powered website</p>
+
+                            <div class="flex gap-2">
+                                <!-- Search -->
+                                <div class="search relative min-w-0 flex-1 sm:w-56 sm:flex-none">
+                                    <Icon name="search" :stroke="1.8" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-lp-subtle" />
+                                    <input ref="searchInput" v-model="search" type="search" placeholder="Search websites" aria-label="Search websites" class="search-input" />
+                                    <kbd v-if="!search" class="kbd pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 sm:inline-flex">/</kbd>
+                                </div>
+
+                                <!-- Sort -->
+                                <AppMenu width="w-44">
+                                    <template #trigger="{ toggle, open }">
+                                        <button type="button" class="tool-btn" :aria-expanded="open" aria-haspopup="menu" @click="toggle">
+                                            <Icon name="chevronUpDown" :stroke="1.8" class="size-4" /><span class="hidden sm:inline">{{ sortLabel }}</span>
+                                        </button>
+                                    </template>
+                                    <template #default="{ close }">
+                                        <button v-for="s in sorts" :key="s.key" type="button" class="menu-item justify-between" role="menuitemradio" :aria-checked="sort === s.key" @click="sort = s.key; close()">
+                                            {{ s.label }}<Icon v-if="sort === s.key" name="check" :stroke="2.2" class="size-4 text-lp-accent" />
+                                        </button>
+                                    </template>
+                                </AppMenu>
                             </div>
                         </div>
-                        <form @submit.prevent="createProject">
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">Project Name</label>
-                                <input
-                                    v-model="form.name"
-                                    type="text"
-                                    class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-shadow text-sm"
-                                    placeholder="My Awesome Website"
-                                    required
-                                    autofocus
-                                />
-                                <p v-if="form.errors.name" class="text-red-500 text-xs mt-1.5">{{ form.errors.name }}</p>
-                            </div>
-                            <div class="mb-6">
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">Description <span class="text-gray-400 font-normal">(optional)</span></label>
-                                <textarea
-                                    v-model="form.description"
-                                    rows="2"
-                                    class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-shadow text-sm resize-none"
-                                    placeholder="A brief description of your website..."
-                                ></textarea>
-                            </div>
-                            <div class="flex gap-3">
-                                <button
-                                    type="button"
-                                    @click="showModal = false"
-                                    class="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    :disabled="form.processing"
-                                    class="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xl hover:shadow-lg hover:shadow-indigo-500/20 transition-all disabled:opacity-50"
-                                >
-                                    {{ form.processing ? 'Creating...' : 'Create Project' }}
-                                </button>
-                            </div>
-                        </form>
                     </div>
-                </div>
-            </Transition>
-        </Teleport>
+
+                    <!-- No matches -->
+                    <div v-if="!visible.length" class="card mt-6 flex flex-col items-center px-6 py-14 text-center">
+                        <span class="icon-tile size-12 rounded-2xl"><Icon name="search" :stroke="1.6" class="size-5" /></span>
+                        <p class="mt-4 font-semibold text-lp-fg">No websites match{{ search ? ` “${search}”` : '' }}</p>
+                        <p class="mt-1 text-sm text-lp-muted">Try a different search or filter.</p>
+                        <button type="button" class="btn btn-ghost mt-5 h-10 px-4 text-sm" @click="resetFilters">Clear filters</button>
+                    </div>
+
+                    <!-- Grid -->
+                    <TransitionGroup v-else tag="div" name="grid" class="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                        <ProjectCard v-for="project in visible" :key="project.id" :project="project" @delete="askDelete" />
+                        <button v-if="filter === 'all' && !search" key="new" type="button" class="new-card group" @click="openCreate">
+                            <span class="flex size-12 items-center justify-center rounded-2xl border border-dashed border-lp-ink/20 text-lp-subtle transition group-hover:border-violet-400/60 group-hover:text-lp-accent">
+                                <Icon name="plus" :stroke="1.8" class="size-5" />
+                            </span>
+                            <span class="mt-3 text-sm font-semibold text-lp-fg">New website</span>
+                            <span class="mt-0.5 text-xs text-lp-subtle">Start blank or from an idea</span>
+                        </button>
+                    </TransitionGroup>
+                </section>
+            </template>
+        </div>
+
+        <CreateProjectModal v-model="createOpen" />
+
+        <AppModal v-model="deleteOpen" tone="danger" icon="trash" title="Delete this website?" :description="toDelete ? `“${toDelete.name}” and all of its pages, versions and analytics will be permanently removed. This can't be undone.` : ''">
+            <div class="flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+                <button type="button" class="btn btn-ghost h-11 px-5 text-sm" @click="deleteOpen = false">Cancel</button>
+                <button type="button" class="btn h-11 bg-rose-600 px-5 text-sm text-white hover:bg-rose-500 disabled:opacity-60" :disabled="deleting" @click="confirmDelete">
+                    {{ deleting ? 'Deleting…' : 'Delete website' }}
+                </button>
+            </div>
+        </AppModal>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+.kbd {
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.35rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.15);
+    padding: 0 0.3rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    opacity: 0.7;
+}
+.btn-primary .kbd { border-color: currentColor; opacity: 0.45; }
+
+.segmented {
+    display: inline-flex;
+    gap: 0.25rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.08);
+    background: rgb(var(--lp-ink) / 0.03);
+    padding: 0.25rem;
+}
+.segment {
+    display: inline-flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.55rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: rgb(var(--lp-muted));
+    transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.segment:hover { color: rgb(var(--lp-fg)); }
+.segment--active {
+    background: rgb(var(--lp-surface));
+    color: rgb(var(--lp-fg));
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 0 0 1px rgb(var(--lp-ink) / 0.06);
+}
+.segment-count {
+    border-radius: 9999px;
+    background: rgb(var(--lp-ink) / 0.07);
+    padding: 0 0.4rem;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.search-input {
+    width: 100%;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.1) !important;
+    background: rgb(var(--lp-surface)) !important;
+    padding: 0 2.25rem 0 2.25rem;
+    font-size: 0.875rem;
+    color: rgb(var(--lp-fg));
+    box-shadow: none !important;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input::placeholder { color: rgb(var(--lp-subtle)); }
+.search-input:focus { outline: none; border-color: rgb(139 92 246 / 0.7) !important; box-shadow: 0 0 0 4px rgb(139 92 246 / 0.14) !important; }
+.search-input::-webkit-search-cancel-button { display: none; }
+
+.tool-btn {
+    display: inline-flex;
+    height: 2.5rem;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.1);
+    background: rgb(var(--lp-surface));
+    padding: 0 0.8rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: rgb(var(--lp-text));
+    white-space: nowrap;
+    transition: border-color 0.2s;
+}
+.tool-btn:hover { border-color: rgb(var(--lp-ink) / 0.2); }
+
+.new-card {
+    display: flex;
+    min-height: 16rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1.25rem;
+    border: 1px dashed rgb(var(--lp-ink) / 0.15);
+    transition: border-color 0.25s, background-color 0.25s;
+}
+.new-card:hover { border-color: rgb(139 92 246 / 0.5); background: rgb(139 92 246 / 0.04); }
+
+/* Filter/search changes animate with transform + opacity only */
+.grid-enter-active { transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.grid-leave-active { transition: opacity 0.15s ease; position: absolute; visibility: hidden; }
+.grid-enter-from { opacity: 0; transform: translateY(8px) scale(0.98); }
+.grid-leave-to { opacity: 0; }
+.grid-move { transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+</style>

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import Icon from './Icon.vue';
 import SectionHeading from './SectionHeading.vue';
+import MiniSite from './MiniSite.vue';
 import { showcase } from './content';
 import { prefersReducedMotion } from './useLandingEffects';
 
@@ -76,58 +77,7 @@ function next() {
 
                         <div class="relative h-[350px] overflow-hidden sm:h-[440px]">
                             <Transition name="swap" mode="out-in">
-                                <div :key="site.key" :class="['site absolute inset-0 overflow-hidden', site.theme.page, site.theme.ink]">
-                                    <!-- Site nav -->
-                                    <div class="flex items-center justify-between px-5 py-4 sm:px-8">
-                                        <span :class="['text-[15px]', site.theme.serif ? 'font-serif text-lg italic' : 'font-bold tracking-tight']">{{ site.brand }}</span>
-                                        <div :class="['flex items-center gap-4 text-xs', site.theme.muted]">
-                                            <span class="hidden sm:inline">About</span>
-                                            <span class="hidden sm:inline">{{ site.sections[2] }}</span>
-                                            <span :class="['rounded-full px-3 py-1.5 font-medium', site.theme.btn]">{{ site.cta.split(' ')[0] }}</span>
-                                        </div>
-                                    </div>
-
-                                    <!-- Site hero -->
-                                    <div class="px-5 pt-4 text-center sm:px-8 sm:pt-6">
-                                        <div :class="['text-[10px] font-semibold uppercase tracking-[0.2em]', site.theme.muted]">{{ site.eyebrow }}</div>
-                                        <div :class="['mx-auto mt-2 max-w-lg leading-[1.05]', site.theme.serif ? 'font-serif text-[30px] italic sm:text-[44px]' : 'text-[26px] font-bold tracking-tight sm:text-[38px]']">{{ site.headline }}</div>
-                                        <p :class="['mx-auto mt-3 hidden max-w-md text-[13px] leading-relaxed sm:block', site.theme.muted]">{{ site.sub }}</p>
-                                        <span :class="['mt-4 inline-flex rounded-full px-4 py-2 text-xs font-semibold sm:mt-5', site.theme.btn]">{{ site.cta }}</span>
-                                    </div>
-
-                                    <!-- Layout-specific body -->
-                                    <div class="mt-6 px-5 sm:mt-8 sm:px-8">
-                                        <div v-if="site.layout === 'gallery'" class="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                                            <div v-for="(t, i) in site.tiles" :key="t" :class="['h-24 rounded-lg bg-gradient-to-br sm:h-32', t, i === 3 && 'hidden sm:block']"></div>
-                                        </div>
-
-                                        <div v-else-if="site.layout === 'features'" class="grid gap-2 sm:grid-cols-3 sm:gap-3">
-                                            <div v-for="(t, i) in site.tiles" :key="t.title" :class="['rounded-xl p-3 sm:p-4', site.theme.card, i > 0 && 'hidden sm:block']">
-                                                <span class="mb-2 block size-6 rounded-md bg-gradient-to-br from-indigo-400 to-violet-500"></span>
-                                                <div class="text-[13px] font-semibold">{{ t.title }}</div>
-                                                <div :class="['mt-0.5 text-[11px]', site.theme.muted]">{{ t.text }}</div>
-                                            </div>
-                                        </div>
-
-                                        <div v-else-if="site.layout === 'menu'" :class="['mx-auto max-w-md rounded-xl p-4', site.theme.card]">
-                                            <div v-for="t in site.tiles" :key="t.title" class="flex items-baseline gap-2 py-1.5 text-[13px]">
-                                                <span class="font-serif text-[15px] italic">{{ t.title }}</span>
-                                                <span class="flex-1 border-b border-dotted border-current opacity-25"></span>
-                                                <span class="font-semibold">{{ t.price }}</span>
-                                            </div>
-                                        </div>
-
-                                        <div v-else-if="site.layout === 'products'" class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-                                            <div v-for="(t, i) in site.tiles" :key="t.title" :class="['rounded-xl p-2', site.theme.card, i === 2 && 'hidden sm:block']">
-                                                <div :class="['h-20 rounded-lg bg-gradient-to-br sm:h-24', t.color]"></div>
-                                                <div class="mt-2 flex items-center justify-between px-1 text-[12px]">
-                                                    <span class="font-semibold">{{ t.title }}</span>
-                                                    <span :class="site.theme.muted">{{ t.price }}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <MiniSite :key="site.key" :site="site" class="absolute inset-0" />
                             </Transition>
                         </div>
                     </div>

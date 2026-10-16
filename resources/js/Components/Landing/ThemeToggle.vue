@@ -8,7 +8,7 @@ const { isDark, toggle } = useColorMode();
 <template>
     <button
         type="button"
-        class="theme-toggle"
+        class="theme-toggle inline-flex"
         :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
         :title="isDark ? 'Light mode' : 'Dark mode'"
         @click="toggle"
@@ -22,7 +22,6 @@ const { isDark, toggle } = useColorMode();
 
 <style scoped>
 .theme-toggle {
-    display: inline-flex;
     width: 2.25rem;
     height: 2.25rem;
     align-items: center;

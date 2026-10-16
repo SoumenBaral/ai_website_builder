@@ -1,201 +1,92 @@
 <script setup>
-import { ref } from 'vue';
-import ApplicationLogo from '@/Components/ApplicationLogo.vue';
-import Dropdown from '@/Components/Dropdown.vue';
-import DropdownLink from '@/Components/DropdownLink.vue';
-import NavLink from '@/Components/NavLink.vue';
-import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-import { Link } from '@inertiajs/vue3';
+import '../../css/landing.css';
+import { ref, watch, onBeforeUnmount } from 'vue';
+import { router } from '@inertiajs/vue3';
+import BrandLogo from '@/Components/Landing/BrandLogo.vue';
+import ThemeToggle from '@/Components/Landing/ThemeToggle.vue';
+import Icon from '@/Components/Landing/Icon.vue';
+import AppSidebar from '@/Components/App/AppSidebar.vue';
+import { useColorMode, useDocumentTheme } from '@/Components/Landing/useColorMode';
 
-const showingNavigationDropdown = ref(false);
+/*
+ * Signed-in app shell: fixed sidebar on desktop, slide-over drawer on mobile.
+ * Shares the landing design system and the visitor's light/dark preference.
+ */
+const { theme } = useColorMode();
+useDocumentTheme();
+
+const drawer = ref(false);
+const onKey = (e) => { if (e.key === 'Escape') drawer.value = false; };
+watch(drawer, (open) => {
+    document.body.style.overflow = open ? 'hidden' : '';
+    open ? window.addEventListener('keydown', onKey) : window.removeEventListener('keydown', onKey);
+});
+const stopNavListener = router.on('navigate', () => { drawer.value = false; });
+onBeforeUnmount(() => {
+    stopNavListener();
+    document.body.style.overflow = '';
+    window.removeEventListener('keydown', onKey);
+});
 </script>
 
 <template>
-    <div>
-        <div class="min-h-screen bg-gray-100">
-            <nav
-                class="border-b border-gray-100 bg-white"
-            >
-                <!-- Primary Navigation Menu -->
-                <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div class="flex h-16 justify-between">
-                        <div class="flex">
-                            <!-- Logo -->
-                            <div class="flex shrink-0 items-center">
-                                <Link :href="route('dashboard')" class="flex items-center gap-2.5">
-                                    <div class="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-600 shadow-lg shadow-indigo-500/20">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="white" class="size-5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
-                                        </svg>
-                                    </div>
-                                    <span class="text-lg font-bold tracking-tight text-gray-900">Ai<span class="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">Web</span>Builder</span>
-                                </Link>
-                            </div>
+    <div class="landing app min-h-screen font-sans antialiased" :data-theme="theme">
+        <!-- Desktop sidebar -->
+        <aside class="sidebar fixed inset-y-0 left-0 z-40 hidden w-64 lg:block">
+            <AppSidebar />
+        </aside>
 
-                            <!-- Navigation Links -->
-                            <div
-                                class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex"
-                            >
-                                <NavLink
-                                    :href="route('dashboard')"
-                                    :active="route().current('dashboard')"
-                                >
-                                    Dashboard
-                                </NavLink>
-                            </div>
-                        </div>
+        <!-- Mobile top bar -->
+        <div class="topbar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 lg:hidden">
+            <BrandLogo :href="route('dashboard')" small />
+            <div class="flex items-center gap-1.5">
+                <ThemeToggle />
+                <button type="button" class="flex size-9 items-center justify-center rounded-lg text-lp-muted transition hover:bg-lp-ink/5 hover:text-lp-fg" aria-label="Open menu" :aria-expanded="drawer" @click="drawer = true">
+                    <Icon name="menu" :stroke="1.8" class="size-6" />
+                </button>
+            </div>
+        </div>
 
-                        <div class="hidden sm:ms-6 sm:flex sm:items-center">
-                            <!-- Settings Dropdown -->
-                            <div class="relative ms-3">
-                                <Dropdown align="right" width="48">
-                                    <template #trigger>
-                                        <span class="inline-flex rounded-md">
-                                            <button
-                                                type="button"
-                                                class="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-500 transition duration-150 ease-in-out hover:text-gray-700 focus:outline-none"
-                                            >
-                                                {{ $page.props.auth.user.name }}
-
-                                                <svg
-                                                    class="-me-0.5 ms-2 h-4 w-4"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
-                                                >
-                                                    <path
-                                                        fill-rule="evenodd"
-                                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                                        clip-rule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                        </span>
-                                    </template>
-
-                                    <template #content>
-                                        <DropdownLink
-                                            :href="route('profile.edit')"
-                                        >
-                                            Profile
-                                        </DropdownLink>
-                                        <DropdownLink
-                                            :href="route('logout')"
-                                            method="post"
-                                            as="button"
-                                        >
-                                            Log Out
-                                        </DropdownLink>
-                                    </template>
-                                </Dropdown>
-                            </div>
-                        </div>
-
-                        <!-- Hamburger -->
-                        <div class="-me-2 flex items-center sm:hidden">
-                            <button
-                                @click="
-                                    showingNavigationDropdown =
-                                        !showingNavigationDropdown
-                                "
-                                class="inline-flex items-center justify-center rounded-md p-2 text-gray-400 transition duration-150 ease-in-out hover:bg-gray-100 hover:text-gray-500 focus:bg-gray-100 focus:text-gray-500 focus:outline-none"
-                            >
-                                <svg
-                                    class="h-6 w-6"
-                                    stroke="currentColor"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        :class="{
-                                            hidden: showingNavigationDropdown,
-                                            'inline-flex':
-                                                !showingNavigationDropdown,
-                                        }"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M4 6h16M4 12h16M4 18h16"
-                                    />
-                                    <path
-                                        :class="{
-                                            hidden: !showingNavigationDropdown,
-                                            'inline-flex':
-                                                showingNavigationDropdown,
-                                        }"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12"
-                                    />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
+        <!-- Mobile drawer -->
+        <Transition name="drawer">
+            <div v-if="drawer" class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+                <div class="drawer-backdrop absolute inset-0" @click="drawer = false"></div>
+                <div class="drawer-panel sidebar absolute inset-y-0 left-0 w-[17rem] max-w-[85vw]">
+                    <button type="button" class="absolute right-3 top-3.5 z-10 flex size-9 items-center justify-center rounded-lg text-lp-subtle hover:bg-lp-ink/5 hover:text-lp-fg" aria-label="Close menu" @click="drawer = false">
+                        <Icon name="xMark" :stroke="2" class="size-5" />
+                    </button>
+                    <AppSidebar @navigate="drawer = false" />
                 </div>
+            </div>
+        </Transition>
 
-                <!-- Responsive Navigation Menu -->
-                <div
-                    :class="{
-                        block: showingNavigationDropdown,
-                        hidden: !showingNavigationDropdown,
-                    }"
-                    class="sm:hidden"
-                >
-                    <div class="space-y-1 pb-3 pt-2">
-                        <ResponsiveNavLink
-                            :href="route('dashboard')"
-                            :active="route().current('dashboard')"
-                        >
-                            Dashboard
-                        </ResponsiveNavLink>
-                    </div>
-
-                    <!-- Responsive Settings Options -->
-                    <div
-                        class="border-t border-gray-200 pb-1 pt-4"
-                    >
-                        <div class="px-4">
-                            <div
-                                class="text-base font-medium text-gray-800"
-                            >
-                                {{ $page.props.auth.user.name }}
-                            </div>
-                            <div class="text-sm font-medium text-gray-500">
-                                {{ $page.props.auth.user.email }}
-                            </div>
-                        </div>
-
-                        <div class="mt-3 space-y-1">
-                            <ResponsiveNavLink :href="route('profile.edit')">
-                                Profile
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                :href="route('logout')"
-                                method="post"
-                                as="button"
-                            >
-                                Log Out
-                            </ResponsiveNavLink>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-
-            <!-- Page Heading -->
-            <header
-                class="bg-white shadow"
-                v-if="$slots.header"
-            >
-                <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                    <slot name="header" />
-                </div>
+        <div class="lg:pl-64">
+            <header v-if="$slots.header" class="px-4 pt-8 sm:px-6 lg:px-10 lg:pt-10">
+                <div class="mx-auto max-w-6xl"><slot name="header" /></div>
             </header>
-
-            <!-- Page Content -->
-            <main>
+            <main class="relative">
                 <slot />
             </main>
         </div>
     </div>
 </template>
+
+<style scoped>
+.sidebar {
+    border-right: 1px solid rgb(var(--lp-ink) / 0.07);
+    background: rgb(var(--lp-bg));
+}
+.topbar {
+    border-bottom: 1px solid rgb(var(--lp-ink) / 0.07);
+    background: var(--lp-nav);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    backdrop-filter: blur(14px) saturate(160%);
+}
+.drawer-backdrop { background: rgb(5 5 10 / 0.5); }
+.drawer-panel { box-shadow: 20px 0 60px -10px rgb(0 0 0 / 0.4); }
+
+.drawer-enter-active, .drawer-leave-active { transition: opacity 0.25s ease; }
+.drawer-enter-active .drawer-panel, .drawer-leave-active .drawer-panel { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.drawer-enter-from, .drawer-leave-to { opacity: 0; }
+.drawer-enter-from .drawer-panel, .drawer-leave-to .drawer-panel { transform: translateX(-100%); }
+</style>

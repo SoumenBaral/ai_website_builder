@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\AiWebsiteService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -34,6 +35,10 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            // Monthly AI generation usage for the app sidebar (evaluated lazily, signed-in users only).
+            'usage' => fn () => $request->user()
+                ? app(AiWebsiteService::class)->getRemainingGenerations($request->user()->id)
+                : null,
         ];
     }
 }

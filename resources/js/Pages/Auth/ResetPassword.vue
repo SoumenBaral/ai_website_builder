@@ -1,20 +1,14 @@
 <script setup>
-import GuestLayout from '@/Layouts/GuestLayout.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
 import { Head, useForm } from '@inertiajs/vue3';
+import AuthLayout from '@/Layouts/AuthLayout.vue';
+import AuthInput from '@/Components/Auth/AuthInput.vue';
+import AuthButton from '@/Components/Auth/AuthButton.vue';
+import PasswordStrength from '@/Components/Auth/PasswordStrength.vue';
+import Icon from '@/Components/Landing/Icon.vue';
 
 const props = defineProps({
-    email: {
-        type: String,
-        required: true,
-    },
-    token: {
-        type: String,
-        required: true,
-    },
+    email: { type: String, required: true },
+    token: { type: String, required: true },
 });
 
 const form = useForm({
@@ -32,70 +26,53 @@ const submit = () => {
 </script>
 
 <template>
-    <GuestLayout>
-        <Head title="Reset Password" />
+    <AuthLayout icon="shield" title="Choose a new" accent="password." subtitle="Make it something you haven't used before.">
+        <Head title="Reset password" />
 
-        <form @submit.prevent="submit">
-            <div>
-                <InputLabel for="email" value="Email" />
+        <form class="space-y-5" novalidate @submit.prevent="submit">
+            <AuthInput
+                id="email"
+                v-model="form.email"
+                type="email"
+                label="Email"
+                icon="envelope"
+                autocomplete="username"
+                :error="form.errors.email"
+                required
+            />
 
-                <TextInput
-                    id="email"
-                    type="email"
-                    class="mt-1 block w-full"
-                    v-model="form.email"
-                    required
-                    autofocus
-                    autocomplete="username"
-                />
+            <AuthInput
+                id="password"
+                v-model="form.password"
+                type="password"
+                label="New password"
+                icon="lock"
+                placeholder="At least 8 characters"
+                autocomplete="new-password"
+                :error="form.errors.password"
+                required
+                autofocus
+            >
+                <template v-if="form.password" #below>
+                    <PasswordStrength :password="form.password" />
+                </template>
+            </AuthInput>
 
-                <InputError class="mt-2" :message="form.errors.email" />
-            </div>
+            <AuthInput
+                id="password_confirmation"
+                v-model="form.password_confirmation"
+                type="password"
+                label="Confirm new password"
+                icon="lock"
+                placeholder="Repeat your password"
+                autocomplete="new-password"
+                :error="form.errors.password_confirmation"
+                required
+            />
 
-            <div class="mt-4">
-                <InputLabel for="password" value="Password" />
-
-                <TextInput
-                    id="password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    v-model="form.password"
-                    required
-                    autocomplete="new-password"
-                />
-
-                <InputError class="mt-2" :message="form.errors.password" />
-            </div>
-
-            <div class="mt-4">
-                <InputLabel
-                    for="password_confirmation"
-                    value="Confirm Password"
-                />
-
-                <TextInput
-                    id="password_confirmation"
-                    type="password"
-                    class="mt-1 block w-full"
-                    v-model="form.password_confirmation"
-                    required
-                    autocomplete="new-password"
-                />
-
-                <InputError
-                    class="mt-2"
-                    :message="form.errors.password_confirmation"
-                />
-            </div>
-
-            <div class="mt-4 flex items-center justify-end">
-                <PrimaryButton
-                    :class="{ 'opacity-25': form.processing }"
-                    :disabled="form.processing"
-                >
-                    Reset Password
-                </PrimaryButton>
-            </div>
+            <AuthButton :loading="form.processing" class="!mt-7">
+                Reset password <Icon name="arrow" :stroke="2.2" class="size-4" />
+            </AuthButton>
         </form>
-    </GuestLayout>
+    </AuthLayout>
 </template>

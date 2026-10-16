@@ -24,6 +24,20 @@ export const useEditor = defineStore('editor', {
     },
 
     actions: {
+        /**
+         * Open a page in the editor. The store outlives Inertia page visits, so
+         * history from a previously opened project must be cleared — otherwise
+         * undo could restore another project's content (and autosave it here).
+         */
+        load(schema) {
+            this.schema = JSON.parse(JSON.stringify(schema));
+            this.history = [];
+            this.future = [];
+            this.selectedId = null;
+            this.dirty = false;
+            this.saving = false;
+        },
+
         setSchema(schema) {
             this.pushHistory();
             this.schema = JSON.parse(JSON.stringify(schema));
@@ -79,6 +93,24 @@ export const useEditor = defineStore('editor', {
                 this.schema.sections[idx] = newSection;
                 this.dirty = true;
             }
+        },
+
+        duplicateBlock(id) {
+            const idx = this.schema.sections.findIndex(s => s.id === id);
+            if (idx === -1) return;
+            const source = this.schema.sections[idx];
+            const copy = JSON.parse(JSON.stringify(source));
+            copy.id = `blk_${source.type}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            this.addBlock(copy, idx + 1);
+        },
+
+        moveBlock(id, direction) {
+            const idx = this.schema.sections.findIndex(s => s.id === id);
+            const target = idx + direction;
+            if (idx === -1 || target < 0 || target >= this.schema.sections.length) return;
+            const sections = [...this.schema.sections];
+            [sections[idx], sections[target]] = [sections[target], sections[idx]];
+            this.reorder(sections);
         },
 
         removeBlock(id) {
