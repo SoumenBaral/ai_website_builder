@@ -6,7 +6,17 @@
     <title>{{ $meta['title'] ?? 'My Website' }}</title>
     <meta name="description" content="{{ $meta['description'] ?? '' }}">
     {!! $head ?? '' !!}
+    @if(!empty($tailwind['inline']))
+    <style>{!! $tailwind['inline'] !!}</style>
+    @elseif(!empty($tailwind['href']))
+    <link rel="stylesheet" href="{{ $tailwind['href'] }}">
+    @else
+    {{-- Fallback only if the site stylesheet was never built (npm run build:site). --}}
     <script src="https://cdn.tailwindcss.com"></script>
+    @endif
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://images.unsplash.com">
     <link href="https://fonts.googleapis.com/css2?family={{ urlencode($theme['fontHeading']) }}:wght@400;600;700&family={{ urlencode($theme['fontBody']) }}:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         html { scroll-behavior: smooth; }

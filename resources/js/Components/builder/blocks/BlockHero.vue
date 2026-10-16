@@ -41,8 +41,8 @@ const heightClass = computed(() => ({
         <!-- Image side -->
         <div
             :class="layout === 'split-left' ? 'order-1' : 'order-2'"
-            class="hidden md:block w-1/2 bg-cover bg-center"
-            :style="image ? { backgroundImage: `url(${image})` } : { background: 'var(--secondary, #e2e8f0)' }"
+            class="hidden md:block w-1/2 bg-cover"
+            :style="image ? { backgroundImage: `url(${image})`, backgroundPosition: '50% 18%' } : { background: 'var(--secondary, #e2e8f0)' }"
         ></div>
         <!-- Text side -->
         <div
@@ -78,9 +78,9 @@ const heightClass = computed(() => ({
     <!-- Full background layout -->
     <section
         v-else
-        class="relative flex items-center bg-cover bg-center"
+        class="relative flex items-center bg-cover"
         :class="heightClass"
-        :style="image ? { backgroundImage: `url(${image})` } : {}"
+        :style="image ? { backgroundImage: `url(${image})`, backgroundPosition: '50% 30%' } : {}"
     >
         <div class="absolute inset-0" :style="{ backgroundColor: `rgba(0,0,0,${overlayOpacity / 100})` }"></div>
         <div

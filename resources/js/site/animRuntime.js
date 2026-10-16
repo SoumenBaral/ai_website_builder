@@ -22,6 +22,30 @@
     var MAX_TARGETS = 60;
     var observer = null;
 
+    /* Weak phones, data saver: lighter effects (fewer particles, no glow). */
+    var nav = w.navigator || {};
+    var LOW_POWER = !!((nav.connection && nav.connection.saveData) || (nav.hardwareConcurrency && nav.hardwareConcurrency <= 4) || (nav.deviceMemory && nav.deviceMemory <= 4));
+
+    /*
+     * Endless effects (button pulse/shine, typing loops) only run while their section is on
+     * screen and the tab is visible — the CPU/GPU rests everywhere else.
+     */
+    var seen = null;
+    function watchVisibility(host) {
+        if (!('IntersectionObserver' in w)) return;
+        if (!seen) {
+            seen = new IntersectionObserver(function (entries) {
+                for (var i = 0; i < entries.length; i++) {
+                    entries[i].target.setAttribute('data-onscreen', entries[i].isIntersecting ? 'true' : 'false');
+                }
+            }, { rootMargin: '100px 0px' });
+        }
+        seen.observe(host);
+    }
+    function isLive(host) {
+        return !w.document.hidden && host.getAttribute('data-onscreen') !== 'false';
+    }
+
     function hasClass(el, c) {
         return (' ' + (el.getAttribute('class') || '') + ' ').indexOf(' ' + c + ' ') > -1;
     }
@@ -375,6 +399,10 @@
         } else {
             var count = Math.round(num(spec.count, 3, 120, 40));
             if (w.innerWidth < 640) count = Math.max(3, Math.round(count * 0.55)); // lighter on phones
+            if (LOW_POWER) {
+                count = Math.max(3, Math.round(count * 0.5));
+                spec.glow = false;
+            }
             for (var i = 0; i < count; i++) particle(spec, r, i, layer);
         }
 
@@ -473,6 +501,7 @@
     }
 
     function markButtons(host) {
+        watchVisibility(host);
         var old = host.querySelectorAll('[data-btn]');
         for (var i = 0; i < old.length; i++) old[i].removeAttribute('data-btn');
         if (!host.getAttribute('data-btn-fx')) return;
@@ -568,7 +597,12 @@
     }
 
     function later(st, fn, ms) {
-        st.timers.push(setTimeout(fn, ms));
+        // Hold the effect (instead of typing unseen) while its section is off screen / tab hidden.
+        var run = function () {
+            if (st.host && !isLive(st.host)) return st.timers.push(setTimeout(run, 400));
+            fn();
+        };
+        st.timers.push(setTimeout(run, ms));
     }
 
     function runTyping(st, units, step, done) {
@@ -697,6 +731,7 @@
      */
     function textFx(host, preview) {
         stopText(host);
+        if (!preview) watchVisibility(host);
         if (!host.getAttribute('data-text-fx') || !headingOf(host)) return;
         if (w.matchMedia && w.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             if (host.getAttribute('data-text-fx') === 'gradient') headingOf(host).setAttribute('data-tx', 'gradient');

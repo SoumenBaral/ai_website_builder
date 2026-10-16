@@ -151,6 +151,7 @@ async function fillPhotos(key, items, onlyMissing = true) {
 
 // Fields every block of a type should offer, even if older saved sections don't have them yet.
 const OFFERED_FIELDS = { navbar: { logo: '', hideBrandText: false } };
+const LOGO_SIZES = [{ v: 'sm', l: 'Small' }, { v: 'md', l: 'Medium' }, { v: 'lg', l: 'Large' }, { v: 'xl', l: 'Extra large' }];
 const displayProps = computed(() => (block.value ? { ...(OFFERED_FIELDS[block.value.type] || {}), ...block.value.props } : {}));
 const hasImageStyle = computed(() => block.value && (block.value.props.image || block.value.props.imageRadius || block.value.props.imageShadow || block.value.props.imageBorder));
 
@@ -488,11 +489,20 @@ const quickActions = computed(() => {
                             <input v-else type="text" :value="value" class="ed-input" @input="update(key, $event.target.value)" />
                         </div>
 
+                        <!-- Logo size (navbar) -->
+                        <div v-else-if="key === 'logoSize'" />
+
                         <!-- On/off options -->
                         <label v-else-if="typeof value === 'boolean'" class="flex cursor-pointer items-center justify-between gap-3">
                             <span class="ed-label !mb-0">{{ key === 'hideBrandText' ? 'Show only the logo (hide brand text)' : humanize(key) }}</span>
                             <button type="button" role="switch" :aria-checked="value" :class="['toggle', value && 'toggle--on']" @click="update(key, !value)"><span></span></button>
                         </label>
+                        <div v-if="key === 'hideBrandText' && block.props.logo" class="!mt-3">
+                            <label class="ed-label">Logo size</label>
+                            <div class="grid grid-cols-4 gap-1">
+                                <button v-for="z in LOGO_SIZES" :key="z.v" type="button" :class="['ed-option !px-1 !py-1.5 text-[11.5px]', (block.props.logoSize || (block.props.hideBrandText ? 'md' : 'sm')) === z.v && 'ed-option--active']" @click="update('logoSize', z.v)">{{ z.l }}</button>
+                            </div>
+                        </div>
 
                         <!-- Numbers -->
                         <div v-else-if="typeof value === 'number'">

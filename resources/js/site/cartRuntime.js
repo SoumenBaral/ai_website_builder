@@ -230,7 +230,7 @@
         try {
             saved = JSON.parse(w.localStorage.getItem(KEY + ':customer') || '{}');
         } catch (e) {}
-        var canOrder = S.mode === 'live' && S.orderUrl;
+        var canOrder = (S.mode === 'live' && S.orderUrl) || S.mode === 'demo';
         var form =
             '<form class="sc-form" novalidate data-sc-form>' +
             '<div class="sc-err" role="alert" hidden></div>' +
@@ -242,6 +242,7 @@
             '<input type="text" name="website" tabindex="-1" autocomplete="off" class="sc-hp" aria-hidden="true">' +
             (canOrder ? '<button type="submit" class="sc-btn sc-primary">Place order</button>' : '') +
             (S.mode === 'preview' ? '<p class="sc-notice">Ordering is turned off in preview. Publish your site to start taking orders.</p>' : '') +
+            (S.mode === 'demo' ? '<p class="sc-notice">This is a demo shop — nothing is charged or sent. Try it out!</p>' : '') +
             '</form>';
         return header('Checkout', true) +
             '<div class="sc-scroll"><div class="sc-mini">' + lines.map(function (l) {
@@ -263,7 +264,8 @@
         return header('Order sent') +
             '<div class="sc-empty sc-done"><span class="sc-done-icon">' + ICON_CHECK + '</span>' +
             '<p class="sc-empty-title">Thank you' + (o.name ? ', ' + esc(o.name.split(' ')[0]) : '') + '!</p>' +
-            (o.number ? '<p>Your order <strong>#' + esc(o.number) + '</strong> has been sent to ' + esc(S.siteName) + '.</p>' : '<p>Your order is ready to send.</p>') +
+            (o.demo ? '<p>Demo order <strong>#' + esc(o.number) + '</strong> complete — on a real site it lands in the owner\'s Orders page and inbox.</p>'
+                : o.number ? '<p>Your order <strong>#' + esc(o.number) + '</strong> has been sent to ' + esc(S.siteName) + '.</p>' : '<p>Your order is ready to send.</p>') +
             (o.total ? '<p class="sc-fine">Total: <strong>' + esc(o.total) + '</strong>' + (o.hasUnpriced ? ' + items priced on request' : '') + '</p>' : '') +
             '<p class="sc-fine">They\'ll contact you soon to confirm delivery and payment.</p>' +
             '<button type="button" class="sc-btn sc-primary" data-sc="close">Continue shopping</button></div>';
@@ -337,6 +339,17 @@
         if (btn) {
             btn.disabled = true;
             btn.textContent = 'Sending…';
+        }
+        if (S.mode === 'demo') {
+            // Demo shop: the full checkout experience, without sending anything.
+            return setTimeout(function () {
+                busy = false;
+                lastOrder = { number: 'DEMO-' + (1000 + Math.floor(Math.random() * 9000)), total: totals(read()).priced ? money(totals(read()).sum) : null, name: c.name, demo: true };
+                clear();
+                view = 'done';
+                render();
+                live.textContent = 'Demo order complete.';
+            }, 900);
         }
         var payload = { name: c.name, phone: c.phone || null, email: c.email || null, address: c.address || null, note: c.note || null, website: c.website, items: read() };
         fetch(S.orderUrl, {

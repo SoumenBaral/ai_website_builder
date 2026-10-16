@@ -6,11 +6,15 @@ use App\Models\Project;
 use App\Services\Ai\BlockCatalog;
 use App\Services\Logo\FaviconService;
 use App\Services\Shop\Shop;
+use App\Services\Ai\Color;
 use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
 class ExportService
 {
+    /** ZIP exports inline the stylesheet so the site works from any folder (and offline). */
+    private bool $inlineCss = false;
+
     /**
      * @param array|null    $favicon     the project's favicon set (null = initials icon in the site's colours)
      * @param string|null   $faviconBase prefix for favicon files; "" when they sit next to index.html (ZIP)
@@ -127,6 +131,19 @@ class ExportService
         return $this->page($schema, $meta, $body, $beacon, $head, true, $shopConfig);
     }
 
+    /** The prebuilt site stylesheet (public/site/site.css), linked or inlined. */
+    private function tailwind(): array
+    {
+        $path = public_path('site/site.css');
+        if (!is_file($path)) {
+            return [];
+        }
+
+        return $this->inlineCss
+            ? ['inline' => file_get_contents($path)]
+            : ['href' => '/site/site.css?v=' . substr(md5_file($path), 0, 10)];
+    }
+
     /** Cart setup for the browser, or null when the site doesn't sell anything. */
     private function shopConfig(array $schema, ?callable $itemUrl, ?array $shop): ?array
     {
@@ -165,6 +182,11 @@ class ExportService
             'links' => $links, // card index => details page URL
         ])->render();
 
+        // Images further down the page load only when the visitor gets near them.
+        if (!in_array($block['type'], ['navbar', 'hero'], true)) {
+            $html = preg_replace('/<img(?![^>]*\bloading=)/i', '<img loading="lazy" decoding="async"', $html);
+        }
+
         $hasBg = !empty($block['props']['sectionBg']);
         $hasText = !empty($block['props']['sectionText']);
         if ($hasBg || $hasText) {
@@ -174,6 +196,13 @@ class ExportService
                 $vars .= '--bg: ' . $bg;
                 if ($block['type'] === 'cta') $vars .= '; --primary: ' . $bg;
                 if ($block['type'] === 'footer') $vars .= '; --secondary: ' . $bg;
+                // Accents (stat numbers, prices, links) in the brand colour would vanish on a band
+                // painted that same colour — use the section's text colour there instead.
+                $primary = Color::normalize($schema['theme']['primaryColor'] ?? null);
+                $bgHex = Color::normalize($block['props']['sectionBg']);
+                if ($block['type'] !== 'cta' && $primary && $bgHex && Color::contrast($primary, $bgHex) < 2.5) {
+                    $vars .= '; --primary: ' . e(Color::normalize($block['props']['sectionText'] ?? null) ?? Color::readableOn($bgHex));
+                }
             }
             if ($hasText) {
                 $txt = e($block['props']['sectionText']);
@@ -181,6 +210,18 @@ class ExportService
                 $vars .= '--text: ' . $txt . '; color: ' . $txt;
             }
             $html = '<div style="' . $vars . ';">' . $html . '</div>';
+        }
+
+        // Bands painted in the brand colour (CTA, or a matching sectionBg): heading shimmer uses a
+        // light/dark sheen of the text colour instead of the (invisible) brand colour.
+        if (($block['props']['textEffect'] ?? null) === 'gradient') {
+            $primary = Color::normalize($schema['theme']['primaryColor'] ?? null);
+            $bandBg = Color::normalize($block['props']['sectionBg'] ?? null) ?? ($block['type'] === 'cta' ? $primary : null);
+            if ($primary && $bandBg && Color::contrast($primary, $bandBg) < 2.5) {
+                $text = Color::normalize($block['props']['sectionText'] ?? null) ?? Color::readableOn($bandBg);
+                $accent = Color::mix($text, Color::isDark($bandBg) ? '#ffffff' : '#000000', 0.45);
+                $html = '<div style="--tx-accent: ' . e($accent) . ';">' . $html . '</div>';
+            }
         }
 
         // Entrance animation + hover effect (see resources/js/site/animRuntime.js)
@@ -198,6 +239,7 @@ class ExportService
     private function page(array $schema, array $meta, string $body, ?string $beacon, string $head, bool $motion, ?array $shop = null): string
     {
         return view('export.shell', [
+            'tailwind' => $this->tailwind(),
             'shop' => $shop ? [
                 'css' => file_get_contents(resource_path('css/site-shop.css')),
                 'config' => json_encode($shop, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP),
@@ -351,6 +393,7 @@ class ExportService
     public function toZip(array $schema, ?Project $project = null): string
     {
         $favicon = $project?->favicon;
+        $this->inlineCss = true;
         // Details pages live in folders next to index.html: services/oxford-shirt.html
         $shop = ['mode' => 'static', 'key' => $project?->slug ?? 'site'];
         $html = $this->toHtml($schema, null, $favicon, '', fn ($anchor, $slug) => "{$anchor}/{$slug}.html", $shop);
@@ -396,6 +439,7 @@ class ExportService
         }
 
         $zip->addFromString('README.txt', $this->zipReadme($schema, $project));
+        $this->inlineCss = false;
 
         // Favicon files sit next to index.html so the site works from any host.
         if ($project && !empty($favicon['files'])) {

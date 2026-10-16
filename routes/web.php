@@ -24,7 +24,9 @@ Route::get('/', function () {
     ]);
 });
 
-Route::get('/demo', fn () => Inertia::render('Demo'));
+Route::get('/demo', [\App\Http\Controllers\DemoController::class, 'show'])->name('demo');
+Route::get('/demo/{section}/{item}', [\App\Http\Controllers\DemoController::class, 'item'])
+    ->where(['section' => '[a-z0-9-]+', 'item' => '[a-z0-9-]+'])->name('demo.item');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Dashboard

@@ -1,15 +1,22 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
+// Same sizes as the published navbar (logos that include the name default larger).
+const LOGO_SIZES = { sm: ['2.25rem', '220px'], md: ['2.75rem', '280px'], lg: ['3.25rem', '320px'], xl: ['3.75rem', '380px'] };
 const props = defineProps({
     brand: String,
     logo: String,
     hideBrandText: { type: Boolean, default: false },
+    logoSize: { type: String, default: '' },
     links: Array,
     ctaText: String,
     ctaHref: String,
     editable: { type: Boolean, default: false },
     id: String,
+});
+const logoStyle = computed(() => {
+    const [h, w] = LOGO_SIZES[props.logoSize || (props.hideBrandText ? 'md' : 'sm')] || LOGO_SIZES.sm;
+    return { height: h, maxWidth: `min(${w}, 60vw)` };
 });
 const emit = defineEmits(['update:props']);
 
@@ -29,7 +36,8 @@ function onEdit(e, key) {
                     v-if="logo"
                     :src="logo"
                     :alt="brand || 'Logo'"
-                    class="h-9 w-auto max-w-[240px] shrink-0 object-contain"
+                    class="w-auto shrink-0 object-contain"
+                    :style="logoStyle"
                 />
                 <div
                     v-if="brand && !(logo && hideBrandText) || !logo"

@@ -3,8 +3,9 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
-        "dev": "vite"
+        "build": "vite build && npm run build:site",
+        "dev": "vite",
+        "build:site": "tailwindcss -c tailwind.site.config.js -i resources/css/site-tailwind.css -o public/site/site.css --minify"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^2.0.0",

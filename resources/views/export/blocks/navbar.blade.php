@@ -3,7 +3,13 @@
     <div class="flex items-center justify-between px-6 py-4" style="box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
         <a href="#" class="flex min-w-0 items-center gap-3" style="color: inherit; text-decoration: none;">
             @if(!empty($props['logo']))
-                <img src="{{ $props['logo'] }}" alt="{{ $props['brand'] ?? 'Logo' }}" style="height: 2.25rem; width: auto; max-width: 240px; object-fit: contain;">
+                @php
+                    // Logos that include the name read better a little larger.
+                    $logoSize = $props['logoSize'] ?? (!empty($props['hideBrandText']) ? 'md' : 'sm');
+                    [$logoH, $logoHMobile, $logoW] = ['sm' => ['2.25rem', '2rem', '220px'], 'md' => ['2.75rem', '2.25rem', '280px'], 'lg' => ['3.25rem', '2.5rem', '320px'], 'xl' => ['3.75rem', '2.75rem', '380px']][$logoSize] ?? ['2.25rem', '2rem', '220px'];
+                @endphp
+                <img src="{{ $props['logo'] }}" alt="{{ $props['brand'] ?? 'Logo' }}" class="site-logo" style="--logo-h: {{ $logoH }}; --logo-h-sm: {{ $logoHMobile }}; height: var(--logo-h-sm); width: auto; max-width: min({{ $logoW }}, 60vw); object-fit: contain;">
+                <style>@media (min-width: 768px) { .site-logo { height: var(--logo-h) !important; } }</style>
             @endif
             @if(empty($props['logo']) || (!empty($props['brand']) && empty($props['hideBrandText'])))
                 <span class="text-xl font-bold" style="font-family: var(--font-heading);">{{ $props['brand'] ?? 'Brand' }}</span>

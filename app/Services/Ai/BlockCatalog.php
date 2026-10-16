@@ -152,6 +152,7 @@ final class BlockCatalog
                     'logo' => self::upload('Logo image URL uploaded by the user. Keep the current value exactly; never invent, describe or generate a logo — use null if there is none.'),
                     'brand' => self::text('Brand / business name as plain text (shown next to the logo)', true),
                     'hideBrandText' => self::flag('true when the uploaded logo already contains the name; keep the current value'),
+                    'logoSize' => self::choice(['sm', 'md', 'lg', 'xl'], 'Logo height in the header (lg/xl for logos that include the name)'),
                     'links' => self::items($link, 3, 6, '3–5 links to sections on this page'),
                     'ctaText' => self::text('Short action, e.g. "Book a call"'),
                     'ctaHref' => self::text('Usually "#contact" or "#pricing"'),

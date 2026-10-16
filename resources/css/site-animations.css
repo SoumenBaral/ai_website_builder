@@ -22,7 +22,7 @@
 [data-anim='from-left'] { --anim-from: translate3d(-44px, 0, 0); }
 [data-anim='from-right'] { --anim-from: translate3d(44px, 0, 0); }
 [data-anim='zoom'] { --anim-from: scale(0.94); }
-[data-anim='blur'] { --anim-from: translate3d(0, 10px, 0); --anim-blur: 10px; }
+[data-anim='blur'] { --anim-from: translate3d(0, 10px, 0); --anim-blur: 6px; }
 [data-anim='flip'] { --anim-from: perspective(900px) rotateX(22deg) translate3d(0, 24px, 0); --anim-origin: 50% 100%; }
 
 .anim-on [data-anim] :is([data-at='0'], [data-at='1']) {
@@ -170,10 +170,23 @@
 [data-btn-fx] [data-btn] { --btn-c: var(--primary); }
 [data-btn-fx] [data-btn]:focus-visible { outline: 2px solid var(--btn-c); outline-offset: 3px; }
 
-[data-btn-fx='pulse'] [data-btn] { animation: btn-pulse 2.2s cubic-bezier(0.22, 1, 0.36, 1) var(--btn-delay, 0s) infinite; }
+/* Pulse & glow animate only transform/opacity of a pseudo-element: the GPU handles them,
+   nothing is repainted per frame. */
+[data-btn-fx='pulse'] [data-btn], [data-btn-fx='glow'] [data-btn] { position: relative; isolation: isolate; }
+[data-btn-fx='pulse'] [data-btn]::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    border: 2px solid var(--btn-c);
+    opacity: 0;
+    pointer-events: none;
+    animation: btn-pulse 2.2s cubic-bezier(0.22, 1, 0.36, 1) var(--btn-delay, 0s) infinite;
+}
 @keyframes btn-pulse {
-    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--btn-c) 55%, transparent); }
-    70%, 100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--btn-c) 0%, transparent); }
+    0% { transform: scale(1); opacity: 0.6; }
+    70%, 100% { transform: scale(1.12, 1.45); opacity: 0; }
 }
 
 [data-btn-fx='shine'] [data-btn] { position: relative; overflow: hidden; isolation: isolate; }
@@ -194,11 +207,18 @@
     45%, 100% { transform: skewX(-20deg) translateX(420%); }
 }
 
-[data-btn-fx='glow'] [data-btn] { animation: btn-glow 2.6s ease-in-out var(--btn-delay, 0s) infinite alternate; }
-@keyframes btn-glow {
-    from { box-shadow: 0 0 6px 0 color-mix(in srgb, var(--btn-c) 35%, transparent), 0 0 0 0 transparent; }
-    to { box-shadow: 0 0 22px 2px color-mix(in srgb, var(--btn-c) 70%, transparent), 0 0 44px 6px color-mix(in srgb, var(--btn-c) 25%, transparent); }
+[data-btn-fx='glow'] [data-btn]::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    box-shadow: 0 0 22px 3px color-mix(in srgb, var(--btn-c) 70%, transparent), 0 0 46px 8px color-mix(in srgb, var(--btn-c) 25%, transparent);
+    opacity: 0.25;
+    pointer-events: none;
+    animation: btn-glow 2.6s ease-in-out var(--btn-delay, 0s) infinite alternate;
 }
+@keyframes btn-glow { to { opacity: 1; } }
 
 /* Moves start once the button has finished its entrance (both use transform). */
 [data-btn-fx='bounce'] [data-btn]:not([data-at='0'], [data-at='1']) { animation: btn-bounce 3.4s ease var(--btn-delay, 0s) infinite; }
@@ -222,9 +242,14 @@
 [data-btn-fx='pop'] [data-btn]:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 12px 28px -10px color-mix(in srgb, var(--btn-c) 70%, transparent); }
 [data-btn-fx='pop'] [data-btn]:active { transform: scale(0.96); }
 
+/* Off screen or hovered: endless button effects rest. */
+[data-btn-fx][data-onscreen='false'] [data-btn],
+[data-btn-fx][data-onscreen='false'] [data-btn]::before,
+[data-btn-fx][data-onscreen='false'] [data-btn]::after { animation-play-state: paused !important; }
 /* Every effect pauses while the visitor hovers, so the button feels steady to click. */
 [data-btn-fx]:not([data-btn-fx='pop']) [data-btn]:hover,
-[data-btn-fx='shine'] [data-btn]:hover::after { animation-play-state: paused; }
+[data-btn-fx='shine'] [data-btn]:hover::after,
+[data-btn-fx] [data-btn]:hover::before { animation-play-state: paused; }
 
 /* ---------- Heading effects (data-tx set on the heading by animRuntime.js) ---------- */
 [data-tx] .tx-w { white-space: nowrap; }
@@ -260,7 +285,8 @@
 
 /* gradient shimmer */
 [data-tx='gradient'] {
-    background-image: linear-gradient(90deg, currentColor 0%, var(--primary) 25%, color-mix(in srgb, var(--primary) 45%, #ffffff) 50%, var(--primary) 75%, currentColor 100%);
+    /* --tx-accent: set by the page on bands painted in the brand colour (e.g. a CTA), where --primary would vanish */
+    background-image: linear-gradient(90deg, currentColor 0%, var(--tx-accent, var(--primary)) 25%, color-mix(in srgb, var(--tx-accent, var(--primary)) 45%, #ffffff) 50%, var(--tx-accent, var(--primary)) 75%, currentColor 100%);
     background-size: 200% 100%;
     -webkit-background-clip: text;
     background-clip: text;
@@ -284,7 +310,7 @@
 
 /* ---------- Safety ---------- */
 @media (prefers-reduced-motion: reduce) {
-    .fx-layer, .fx-layer *, [data-btn-fx] [data-btn], [data-btn-fx] [data-btn]::after, [data-tx] { animation: none !important; }
+    .fx-layer, .fx-layer *, [data-btn-fx] [data-btn], [data-btn-fx] [data-btn]::before, [data-btn-fx] [data-btn]::after, [data-tx] { animation: none !important; }
     .anim-on [data-anim] [data-at],
     [data-hover] * {
         opacity: 1 !important;
