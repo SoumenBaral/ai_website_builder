@@ -22,7 +22,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // JSON errors for API routes and for any AJAX call that asks for JSON (the editor's
+        // AI, logo and favicon endpoints). Inertia page visits keep the normal redirect-back.
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
     })->create();

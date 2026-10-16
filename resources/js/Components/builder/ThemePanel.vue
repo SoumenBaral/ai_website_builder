@@ -1,7 +1,10 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import { useEditor } from '@/stores/editor.js';
 import Icon from '@/Components/Landing/Icon.vue';
+import ImagePicker from './ImagePicker.vue';
+import { useFavicon } from './useFavicon';
+import { useToast } from './useToast';
 
 const editor = useEditor();
 const theme = computed(() => editor.schema?.theme);
@@ -47,12 +50,98 @@ function applyPalette(p) {
 const isActivePalette = (p) => theme.value
     && [theme.value.primaryColor, theme.value.secondaryColor, theme.value.backgroundColor, theme.value.textColor].map((c) => (c || '').toLowerCase()).join() === p.colors.join();
 
+/* ---------- Site icon (favicon) ---------- */
+const projectId = inject('projectId');
+const { favicon, busy: faviconBusy, fromImage, reset } = useFavicon();
+const { notify } = useToast();
+const navbar = computed(() => editor.schema?.sections?.find((s) => s.type === 'navbar'));
+const navbarLogo = computed(() => navbar.value?.props?.logo || '');
+const tabIcon = computed(() => favicon.value?.files?.['favicon.svg'] || favicon.value?.files?.['favicon-32.png'] || '');
+const appIcon = computed(() => favicon.value?.files?.['apple-touch-icon.png'] || tabIcon.value);
+const initials = computed(() => (navbar.value?.props?.brand || editor.schema?.meta?.title || 'S').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase());
+const shortTitle = computed(() => editor.schema?.meta?.title || navbar.value?.props?.brand || 'My website');
+const faviconStatus = computed(() => {
+    if (!favicon.value) return navbarLogo.value ? 'Not created yet' : 'Using your initials — add a navbar logo to make it yours';
+    return favicon.value.followsLogo ? 'Matches your navbar logo' : 'Custom icon';
+});
+
+async function useNavbarLogo() {
+    try {
+        await fromImage(projectId, navbarLogo.value, true);
+        notify('Site icon now matches your navbar logo.', 'success');
+    } catch (e) {
+        notify(e.response?.data?.message || 'Could not create the site icon from this logo.', 'error');
+    }
+}
+async function useCustom(url) {
+    if (!url) return;
+    try {
+        await fromImage(projectId, url, false);
+        notify('Custom site icon saved. Publish to update your live site.', 'success');
+    } catch (e) {
+        notify(e.response?.data?.message || 'Could not use that image as the site icon.', 'error');
+    }
+}
+async function resetIcon() {
+    try {
+        await reset(projectId);
+        notify('Site icon reset to your initials.', 'info');
+    } catch {
+        notify('Could not reset the site icon.', 'error');
+    }
+}
+
 const titleLength = computed(() => (editor.schema?.meta?.title || '').length);
 const descLength = computed(() => (editor.schema?.meta?.description || '').length);
 </script>
 
 <template>
     <div v-if="theme" class="space-y-7 p-4">
+        <!-- Site icon -->
+        <section>
+            <div class="flex items-center justify-between">
+                <h4 class="ed-heading">Site icon (favicon)</h4>
+                <svg v-if="faviconBusy" viewBox="0 0 24 24" fill="none" class="size-4 animate-spin text-lp-accent"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg>
+            </div>
+
+            <!-- Previews: browser tabs (light & dark) and a phone home screen -->
+            <div class="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                <div class="space-y-1.5">
+                    <div v-for="mode in ['light', 'dark']" :key="mode" :class="['tab-preview', `tab-preview--${mode}`]">
+                        <img v-if="tabIcon" :src="tabIcon" alt="" class="size-4 shrink-0" />
+                        <span v-else class="initials-icon size-4 text-[7px]" :style="{ background: editor.schema.theme.primaryColor }">{{ initials }}</span>
+                        <span class="truncate">{{ shortTitle }}</span>
+                        <Icon name="xMark" :stroke="2" class="ml-auto size-3 shrink-0 opacity-50" />
+                    </div>
+                </div>
+                <div class="home-preview">
+                    <img v-if="appIcon" :src="appIcon" alt="" class="size-11 rounded-[11px] shadow-md" />
+                    <span v-else class="initials-icon size-11 rounded-[11px] text-sm shadow-md" :style="{ background: editor.schema.theme.primaryColor }">{{ initials }}</span>
+                    <span class="mt-1 max-w-[3.5rem] truncate text-[9px] text-white/90">{{ navbar?.props?.brand || shortTitle }}</span>
+                </div>
+            </div>
+
+            <p class="mt-2.5 flex items-center gap-1.5 text-xs text-lp-muted">
+                <Icon :name="favicon ? 'checkCircle' : 'sparkles'" :stroke="1.8" :class="['size-3.5', favicon ? 'text-emerald-500' : 'text-lp-subtle']" />{{ faviconStatus }}
+            </p>
+
+            <div class="mt-3 flex flex-wrap gap-2">
+                <button v-if="navbarLogo && !(favicon?.followsLogo && favicon?.sourceUrl === navbarLogo)" type="button" class="ed-option" :disabled="faviconBusy" @click="useNavbarLogo">
+                    <Icon name="photo" :stroke="1.7" class="size-3.5" />Use navbar logo
+                </button>
+                <button v-if="favicon" type="button" class="ed-option" :disabled="faviconBusy" @click="resetIcon">
+                    <Icon name="undo" :stroke="1.7" class="size-3.5" />Reset
+                </button>
+            </div>
+            <details class="mt-3">
+                <summary class="cursor-pointer list-none text-xs font-medium text-lp-accent hover:opacity-80">Use a different image…</summary>
+                <div class="mt-2.5">
+                    <ImagePicker :model-value="''" :project-id="projectId" @update:model-value="useCustom" />
+                    <p class="mt-1.5 text-[11px] text-lp-subtle">Square images work best. We create every size browsers and phones need.</p>
+                </div>
+            </details>
+        </section>
+
         <!-- Palettes -->
         <section>
             <h4 class="ed-heading">Palettes</h4>
@@ -167,6 +256,36 @@ const descLength = computed(() => (editor.schema?.meta?.description || '').lengt
 }
 .palette:hover { border-color: rgb(var(--lp-ink) / 0.22); color: rgb(var(--lp-fg)); }
 .palette--active { border-color: rgb(139 92 246 / 0.65); background: rgb(139 92 246 / 0.08); color: rgb(var(--lp-accent)); }
+.tab-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 0.6rem 0.6rem 0.2rem 0.2rem;
+    padding: 0.45rem 0.6rem;
+    font-size: 11px;
+}
+.tab-preview--light { background: #f1f3f4; color: #3c4043; }
+.tab-preview--dark { background: #35363a; color: #e8eaed; }
+.home-preview {
+    display: flex;
+    width: 4.75rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    background: linear-gradient(160deg, #4f46e5, #0f172a 70%);
+    padding: 0.5rem;
+}
+.initials-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 25%;
+    font-weight: 700;
+    color: #fff;
+}
+details summary::-webkit-details-marker { display: none; }
 .radius-demo {
     width: 1.25rem;
     height: 1.25rem;

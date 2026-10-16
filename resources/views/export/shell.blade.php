@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $meta['title'] ?? 'My Website' }}</title>
     <meta name="description" content="{{ $meta['description'] ?? '' }}">
+    {!! $head ?? '' !!}
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family={{ urlencode($theme['fontHeading']) }}:wght@400;600;700&family={{ urlencode($theme['fontBody']) }}:wght@400;500;600&display=swap" rel="stylesheet">
     <style>

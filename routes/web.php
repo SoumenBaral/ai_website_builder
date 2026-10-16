@@ -43,6 +43,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/ai/edit-section', [AiController::class, 'editSection'])->middleware('throttle:20,1')->name('ai.editSection');
     Route::post('/ai/logo', [AiController::class, 'logo'])->middleware('throttle:20,1')->name('ai.logo');
     Route::post('/projects/{project}/logo', [AiController::class, 'saveLogo'])->name('projects.logo');
+    Route::post('/projects/{project}/favicon', [\App\Http\Controllers\FaviconController::class, 'store'])->middleware('throttle:30,1')->name('projects.favicon');
+    Route::delete('/projects/{project}/favicon', [\App\Http\Controllers\FaviconController::class, 'destroy'])->name('projects.favicon.destroy');
 
     // Autosave
     Route::post('/projects/{project}/pages/{page}/autosave', [PageController::class, 'autosave'])->name('pages.autosave');

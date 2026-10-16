@@ -109,7 +109,7 @@ class AiController extends Controller
      * Save a chosen logo. The SVG is re-rendered on the server from the validated
      * spec — SVG markup from the browser is never stored.
      */
-    public function saveLogo(Request $request, Project $project, LogoDesigner $designer, LogoRenderer $renderer)
+    public function saveLogo(Request $request, Project $project, LogoDesigner $designer, LogoRenderer $renderer, \App\Services\Logo\FaviconService $favicons)
     {
         abort_if($project->user_id !== $request->user()->id, 403);
         $data = $request->validate([
@@ -131,10 +131,21 @@ class AiController extends Controller
             'meta' => ['original_name' => 'AI logo — ' . $spec['name'] . '.svg', 'size' => strlen($svg), 'mime' => 'image/svg+xml', 'logo' => $spec],
         ]);
 
+        // The site icon follows the logo unless the user picked a custom favicon.
+        $favicon = $project->favicon;
+        if (($favicon['followsLogo'] ?? true) === true) {
+            try {
+                $favicon = $favicons->fromLogoSpec($project, $spec, $asset->url);
+            } catch (\Throwable $e) {
+                Log::warning('Favicon generation failed', ['project' => $project->id, 'error' => $e->getMessage()]);
+            }
+        }
+
         return response()->json([
             'url' => $asset->url,
             // Logos with the name in them make the navbar text redundant.
             'containsName' => in_array($spec['layout'], ['icon-wordmark', 'monogram-wordmark', 'wordmark'], true),
+            'favicon' => $favicon,
         ]);
     }
 

@@ -32,7 +32,7 @@ fetch("/track", {
 }).catch(function(){});
 </script>';
 
-        return response($export->toHtml($page->schema, $beacon))
+        return response($export->toHtml($page->schema, $beacon, $project->favicon))
             ->header('Content-Type', 'text/html');
     }
 }

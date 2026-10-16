@@ -16,6 +16,7 @@ import VersionHistory from '@/Components/builder/VersionHistory.vue';
 import EditorToasts from '@/Components/builder/EditorToasts.vue';
 import LogoStudio from '@/Components/builder/LogoStudio.vue';
 import { useToast } from '@/Components/builder/useToast';
+import { useFavicon } from '@/Components/builder/useFavicon';
 import Icon from '@/Components/Landing/Icon.vue';
 import ThemeToggle from '@/Components/Landing/ThemeToggle.vue';
 import AppMenu from '@/Components/App/AppMenu.vue';
@@ -52,8 +53,32 @@ const liveUrl = computed(() => `${window.location.origin}/s/${props.project.slug
 const hasSections = computed(() => editor.schema?.sections?.length > 0);
 
 /* ---------- Load + autosave ---------- */
+const { favicon, set: setFavicon, fromImage: faviconFromImage, reset: resetFavicon } = useFavicon();
 onMounted(() => {
     editor.load(props.page.schema);
+    setFavicon(props.project.favicon);
+});
+
+/* ---------- The site icon follows the navbar logo ---------- */
+const navbarLogo = computed(() => editor.schema?.sections?.find((s) => s.type === 'navbar')?.props?.logo || '');
+let faviconTimer = 0;
+// Also runs once after the page loads: a site whose logo has no favicon yet gets one.
+watch(navbarLogo, (url) => {
+    clearTimeout(faviconTimer);
+    faviconTimer = setTimeout(async () => {
+        const current = favicon.value;
+        if (current && current.followsLogo === false) return; // the user chose a custom icon
+        try {
+            if (url && url.startsWith('/storage/assets/') && url !== current?.sourceUrl) {
+                await faviconFromImage(props.project.id, url, true);
+                notify('Site icon updated to match your logo.', 'success');
+            } else if (!url && current?.followsLogo) {
+                await resetFavicon(props.project.id);
+            }
+        } catch {
+            notify('Could not update the site icon from this logo.', 'error');
+        }
+    }, 700);
 });
 
 watchDebounced(

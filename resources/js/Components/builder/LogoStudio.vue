@@ -6,6 +6,7 @@ import AppModal from '@/Components/App/AppModal.vue';
 import Icon from '@/Components/Landing/Icon.vue';
 import { useLogoStudio } from './useLogoStudio';
 import { useToast } from './useToast';
+import { useFavicon } from './useFavicon';
 
 const props = defineProps({
     projectId: { type: [Number, String], required: true },
@@ -14,6 +15,7 @@ const props = defineProps({
 const editor = useEditor();
 const { notify } = useToast();
 const { open, hint } = useLogoStudio();
+const { set: setFavicon } = useFavicon();
 
 const navbar = computed(() => editor.schema?.sections?.find((s) => s.type === 'navbar') || null);
 const brand = computed(() => (navbar.value?.props?.brand || editor.schema?.meta?.title || 'My Brand').slice(0, 60));
@@ -62,10 +64,11 @@ async function useLogo() {
             theme: editor.schema.theme,
             background: background.value,
         });
+        if (data.favicon !== undefined) setFavicon(data.favicon); // set first so the logo watcher doesn't rebuild it
         editor.updateProps(navbar.value.id, { logo: data.url, hideBrandText: data.containsName });
         editor.select(navbar.value.id);
         open.value = false;
-        notify('Logo added to your navbar. Publish to update your live site.', 'success', { duration: 6000 });
+        notify(data.favicon?.followsLogo ? 'Logo and site icon (favicon) updated. Publish to update your live site.' : 'Logo added to your navbar. Publish to update your live site.', 'success', { duration: 6000 });
     } catch (e) {
         notify(e.response?.data?.message || 'Could not save the logo. Please try again.', 'error');
     } finally {

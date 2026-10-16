@@ -19,7 +19,7 @@ class ExportController extends Controller
             abort(404, 'No home page found.');
         }
 
-        $zipPath = $export->toZip($page->schema);
+        $zipPath = $export->toZip($page->schema, $project);
 
         return response()->download($zipPath, "{$project->slug}.zip")->deleteFileAfterSend();
     }
@@ -35,7 +35,7 @@ class ExportController extends Controller
             abort(404);
         }
 
-        return response($export->toHtml($page->schema))
+        return response($export->toHtml($page->schema, null, $project->favicon))
             ->header('Content-Type', 'text/html');
     }
 }

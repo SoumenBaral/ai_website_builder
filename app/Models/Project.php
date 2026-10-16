@@ -6,7 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Project extends Model
 {
-    protected $fillable = ['user_id', 'name', 'slug', 'description', 'thumbnail_path', 'status', 'published_url'];
+    protected $fillable = ['user_id', 'name', 'slug', 'description', 'thumbnail_path', 'favicon', 'status', 'published_url'];
+
+    protected function casts(): array
+    {
+        return ['favicon' => 'array'];
+    }
 
     public function user() { return $this->belongsTo(User::class); }
     public function pages() { return $this->hasMany(Page::class); }
