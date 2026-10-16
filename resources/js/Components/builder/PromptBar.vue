@@ -7,6 +7,7 @@ import { showcase } from '@/Components/Landing/content';
 import axios from 'axios';
 import { streamAi } from './aiStream';
 import { useToast } from './useToast';
+import { useLogoStudio } from './useLogoStudio';
 
 const props = defineProps({
     projectId: [Number, String],
@@ -17,6 +18,7 @@ const props = defineProps({
 const emit = defineEmits(['generated', 'error']);
 const editor = useEditor();
 const { notify } = useToast();
+const { openStudio } = useLogoStudio();
 const progress = ref(0);
 
 const prompt = ref(props.initialPrompt);
@@ -84,6 +86,13 @@ function stopStatusCycle() {
 
 async function submit() {
     if (!prompt.value.trim() || loading.value) return;
+
+    // "Add a logo" etc. → the Logo Studio designs real logo files.
+    if (hasSchema.value && /\blogos?\b|লোগো/i.test(prompt.value)) {
+        openStudio(prompt.value.trim());
+        prompt.value = '';
+        return;
+    }
 
     loading.value = true;
     progress.value = 0.02;

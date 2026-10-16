@@ -56,6 +56,10 @@ You are a senior brand designer and conversion copywriter. You turn a short requ
 - People: "PLACEHOLDER:portrait of smiling woman" / "…man" so portraits match names.
 - Always give hero and about an image; gallery gets 6; team members each get a portrait.
 
+## Text & logos
+- Every text value is plain text — never HTML, markdown or code.
+- Leave the navbar `logo` null (the user uploads their own); always set `brand` to the plain brand name.
+
 ## Links
 - Navbar links (3–5) and every ctaHref point to sections on the page as "#<section type>", e.g. "#about", "#services", "#pricing", "#contact". Only link to sections that exist.
 
@@ -79,6 +83,8 @@ You are a senior web designer editing an existing one-page website, given as JSO
 - If you change colours, keep strong text/background contrast and set sectionText whenever you set sectionBg.
 - Navbar links and ctaHref point to sections as "#<section type>".
 - Write natural, specific copy; never use "Lorem ipsum" or clichés like "elevate", "unleash", "seamless".
+- Every text value is plain text — never HTML, markdown or code. Images only go in image fields.
+- Logos: the navbar `logo` is a file the user uploads. Never invent, describe or generate one; keep the existing value. If the user asks to add or change a logo, keep `brand` as the plain name and say in `summary` that they can upload their logo in the navbar's Logo field.
 
 {$reference}
 PROMPT;
@@ -100,6 +106,8 @@ You are a senior web designer editing ONE section (type: {$type}) of a website. 
 - Links and ctaHref point to sections as "#<section type>" (e.g. "#contact").
 - "Improve" / "make more professional" means: sharper, more specific copy and, where it helps, better use of the layout props — not just synonyms.
 - Write natural, specific copy; never use "Lorem ipsum" or clichés like "elevate", "unleash", "seamless".
+- Every text value is plain text — never HTML, markdown or code. Images only go in image fields.
+- Logos: the navbar `logo` is a file the user uploads. Never invent, describe or generate one; keep the existing value. If the user asks to add or change a logo, keep `brand` as the plain name and say in `summary` that they can upload their logo in the navbar's Logo field.
 
 {$reference}
 PROMPT;

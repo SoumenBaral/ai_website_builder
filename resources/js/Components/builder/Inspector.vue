@@ -7,6 +7,7 @@ import CustomElementEditor from '@/Components/builder/CustomElementEditor.vue';
 import Icon from '@/Components/Landing/Icon.vue';
 import { blockIcons, humanize, singular } from './blockMeta';
 import { useToast } from './useToast';
+import { useLogoStudio } from './useLogoStudio';
 import axios from 'axios';
 import { streamAi } from './aiStream';
 
@@ -14,6 +15,9 @@ const projectId = inject('projectId');
 
 const editor = useEditor();
 const { notify } = useToast();
+const { openStudio } = useLogoStudio();
+const openLogoStudio = (hint = '') => openStudio(hint);
+const LOGO_INTENT = /\blogos?\b|লোগো/i;
 const aiInstruction = ref('');
 const aiLoading = ref(false);
 const aiMode = ref('section'); // 'section' | 'full'
@@ -26,6 +30,9 @@ const STYLE_KEYS = ['sectionBg', 'sectionText', 'imageRadius', 'imageShadow', 'i
 // Multi-line fields are chosen by name (not length) so the control never swaps mid-typing.
 const LONG_TEXT = ['body', 'description', 'subheading', 'text', 'content', 'answer', 'quote', 'bio', 'message', 'about', 'paragraph'];
 const isLongText = (key) => LONG_TEXT.includes(String(key).toLowerCase());
+// Fields every block of a type should offer, even if older saved sections don't have them yet.
+const OFFERED_FIELDS = { navbar: { logo: '', hideBrandText: false } };
+const displayProps = computed(() => (block.value ? { ...(OFFERED_FIELDS[block.value.type] || {}), ...block.value.props } : {}));
 const hasImageStyle = computed(() => block.value && (block.value.props.image || block.value.props.imageRadius || block.value.props.imageShadow || block.value.props.imageBorder));
 
 function update(key, value) {
@@ -104,6 +111,11 @@ function isImageProp(key) {
 async function askAi(instruction) {
     const text = instruction || aiInstruction.value.trim();
     if (!text || aiLoading.value) return;
+    if (LOGO_INTENT.test(text)) {
+        aiInstruction.value = '';
+        openLogoStudio(text);
+        return;
+    }
     aiLoading.value = true;
     let summary = '';
     try {
@@ -321,13 +333,19 @@ const quickActions = computed(() => {
                 <!-- Content fields -->
                 <section v-if="block.type !== 'custom'" class="space-y-4">
                     <h4 class="ed-heading">Content</h4>
-                    <template v-for="(value, key) in block.props" :key="key">
+                    <template v-for="(value, key) in displayProps" :key="key">
                         <template v-if="STYLE_KEYS.includes(key)" />
 
                         <!-- Text / image / colour -->
                         <div v-else-if="typeof value === 'string'">
                             <label class="ed-label">{{ humanize(key) }}</label>
                             <ImagePicker v-if="isImageProp(key)" :model-value="value" :project-id="projectId" @update:model-value="update(key, $event)" />
+                            <template v-if="block.type === 'navbar' && key === 'logo'">
+                                <button type="button" class="logo-ai-btn mt-2" @click="openLogoStudio()">
+                                    <Icon name="sparkles" :stroke="1.8" class="size-4" />Design a logo with AI
+                                </button>
+                                <p class="mt-1.5 text-[11px] leading-relaxed text-lp-subtle">Or upload your own — PNG or SVG with a transparent background works best.</p>
+                            </template>
                             <textarea v-else-if="isLongText(key)" :value="value" rows="3" class="ed-textarea" @input="update(key, $event.target.value)"></textarea>
                             <div v-else-if="key.toLowerCase().includes('color')" class="flex items-center gap-2">
                                 <input type="color" :value="value" class="ed-color" @input="update(key, $event.target.value)" />
@@ -335,6 +353,12 @@ const quickActions = computed(() => {
                             </div>
                             <input v-else type="text" :value="value" class="ed-input" @input="update(key, $event.target.value)" />
                         </div>
+
+                        <!-- On/off options -->
+                        <label v-else-if="typeof value === 'boolean'" class="flex cursor-pointer items-center justify-between gap-3">
+                            <span class="ed-label !mb-0">{{ key === 'hideBrandText' ? 'Show only the logo (hide brand text)' : humanize(key) }}</span>
+                            <button type="button" role="switch" :aria-checked="value" :class="['toggle', value && 'toggle--on']" @click="update(key, !value)"><span></span></button>
+                        </label>
 
                         <!-- Numbers -->
                         <div v-else-if="typeof value === 'number'">
@@ -435,6 +459,44 @@ const quickActions = computed(() => {
     border: 1px solid rgb(139 92 246 / 0.25);
     background: linear-gradient(180deg, rgb(139 92 246 / 0.09), rgb(139 92 246 / 0.02));
 }
+.logo-ai-btn {
+    display: inline-flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 0.6rem;
+    border: 1px solid rgb(139 92 246 / 0.35);
+    background: linear-gradient(180deg, rgb(139 92 246 / 0.14), rgb(139 92 246 / 0.06));
+    padding: 0.5rem 0.75rem;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgb(var(--lp-accent));
+    transition: border-color 0.15s, background-color 0.15s;
+}
+.logo-ai-btn:hover { border-color: rgb(139 92 246 / 0.6); }
+.toggle {
+    position: relative;
+    width: 2.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: rgb(var(--lp-ink) / 0.15);
+    transition: background-color 0.2s;
+}
+.toggle span {
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.toggle--on { background: #8b5cf6; }
+.toggle--on span { transform: translateX(1rem); }
 .menu-pop {
     border-radius: 0.9rem;
     border: 1px solid rgb(var(--lp-ink) / 0.1);

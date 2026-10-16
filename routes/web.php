@@ -41,6 +41,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/ai/generate', [AiController::class, 'generate'])->middleware('throttle:10,1')->name('ai.generate');
     Route::post('/ai/edit-block', [AiController::class, 'editBlock'])->middleware('throttle:20,1')->name('ai.edit');
     Route::post('/ai/edit-section', [AiController::class, 'editSection'])->middleware('throttle:20,1')->name('ai.editSection');
+    Route::post('/ai/logo', [AiController::class, 'logo'])->middleware('throttle:20,1')->name('ai.logo');
+    Route::post('/projects/{project}/logo', [AiController::class, 'saveLogo'])->name('projects.logo');
 
     // Autosave
     Route::post('/projects/{project}/pages/{page}/autosave', [PageController::class, 'autosave'])->name('pages.autosave');

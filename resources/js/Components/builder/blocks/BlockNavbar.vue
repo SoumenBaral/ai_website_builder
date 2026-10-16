@@ -3,6 +3,8 @@ import { ref } from 'vue';
 
 const props = defineProps({
     brand: String,
+    logo: String,
+    hideBrandText: { type: Boolean, default: false },
     links: Array,
     ctaText: String,
     ctaHref: String,
@@ -22,12 +24,21 @@ function onEdit(e, key) {
     <nav style="background: var(--bg); color: var(--text);">
         <!-- Main bar -->
         <div class="flex items-center justify-between px-6 py-4 shadow-lg shadow-black/5">
-            <div
-                class="text-xl font-bold"
-                :style="{ fontFamily: 'var(--font-heading)' }"
-                :contenteditable="editable"
-                @blur="onEdit($event, 'brand')"
-            >{{ brand }}</div>
+            <div class="flex min-w-0 items-center gap-3">
+                <img
+                    v-if="logo"
+                    :src="logo"
+                    :alt="brand || 'Logo'"
+                    class="h-9 w-auto max-w-[240px] shrink-0 object-contain"
+                />
+                <div
+                    v-if="brand && !(logo && hideBrandText) || !logo"
+                    class="truncate text-xl font-bold"
+                    :style="{ fontFamily: 'var(--font-heading)' }"
+                    :contenteditable="editable"
+                    @blur="onEdit($event, 'brand')"
+                >{{ brand }}</div>
+            </div>
 
             <!-- Desktop links -->
             <div class="hidden md:flex items-center gap-6">

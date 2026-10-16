@@ -174,3 +174,41 @@ it('normalises a single edited section with its own rules', function () {
         ->and($section['props']['columns'])->toBe(1)
         ->and($section['props']['members'][0]['image'])->toBe('PLACEHOLDER:portrait of woman chef');
 });
+
+it('rescues a logo the model stuffed into the brand text', function () {
+    $out = $this->n->normalizeSite(site([
+        ['id' => 'n1', 'type' => 'navbar', 'props' => ['links' => [], 'brand' => '<img src="PLACEHOLDER:logo transparent background" alt="Rohit Sharma Logo" style="height:40px;">']],
+        ['id' => 'n2', 'type' => 'navbar', 'props' => ['links' => [], 'brand' => '<img src="https://cdn.example.com/logo.png" alt="Lumen"> Lumen Studio']],
+    ]));
+    // (only the first navbar survives; check each case separately)
+    $first = $out['sections'][0]['props'];
+    $second = $this->n->normalizeSection(['id' => 'n2', 'type' => 'navbar', 'props' => ['brand' => '<img src="https://cdn.example.com/logo.png" alt="Lumen"> Lumen Studio']], site([])['theme'])['props'];
+
+    expect($first['brand'])->toBe('Rohit Sharma')
+        ->and($first)->not->toHaveKey('logo')                 // a placeholder is not a logo
+        ->and($second['brand'])->toBe('Lumen Studio')
+        ->and($second['logo'])->toBe('https://cdn.example.com/logo.png');
+});
+
+it('never invents logos but keeps uploaded ones', function () {
+    $theme = site([])['theme'];
+    $invented = $this->n->normalizeSection(['id' => 'n', 'type' => 'navbar', 'props' => ['brand' => 'B', 'logo' => 'PLACEHOLDER:minimal logo']], $theme)['props'];
+    $uploaded = $this->n->normalizeSection(['id' => 'n', 'type' => 'navbar', 'props' => ['brand' => 'B', 'logo' => '/storage/assets/7/logo.svg']], $theme)['props'];
+
+    expect($invented)->not->toHaveKey('logo')
+        ->and($uploaded['logo'])->toBe('/storage/assets/7/logo.svg');
+});
+
+it('keeps text fields as plain text', function () {
+    $out = $this->n->normalizeSite(site([
+        ['id' => 'h', 'type' => 'hero', 'props' => ['heading' => '<strong>Big</strong> moments<script>x</script>']],
+    ]));
+
+    expect($out['sections'][0]['props']['heading'])->toBe('Big momentsx');
+});
+
+it('tells the model the logo is a user upload', function () {
+    $schema = \App\Services\Ai\BlockCatalog::sectionEditSchema('navbar');
+    expect($schema['properties']['props']['properties']['logo']['description'])->toContain('never invent')
+        ->and($schema['properties']['props']['properties']['logo']['description'])->not->toContain('PLACEHOLDER');
+});

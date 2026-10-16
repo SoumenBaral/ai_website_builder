@@ -179,6 +179,9 @@ final class SchemaNormalizer
     {
         $type = $section['type'];
         $props = is_array($section['props'] ?? null) ? $section['props'] : [];
+        if ($type === 'navbar') {
+            $props = $this->rescueLogo($props);
+        }
         $clean = [];
 
         foreach (BlockCatalog::props($type) as $key => $spec) {
@@ -208,6 +211,12 @@ final class SchemaNormalizer
             case 'image':
                 $str = $this->cleanString($value);
                 if ($str === null) {
+                    return null;
+                }
+                // User uploads (logos) can't be stock photos: drop anything that isn't a real URL.
+                if (!($spec['generated'] ?? true) && !preg_match('#^(https?:)?//|^/#i', $str)) {
+                    $this->fixes[] = "Ignored invented {$path}";
+
                     return null;
                 }
                 if (str_starts_with($str, 'PLACEHOLDER:') || preg_match('#^(https?:)?//#i', $str) || str_starts_with($str, '/')) {
@@ -295,9 +304,37 @@ final class SchemaNormalizer
         if (!is_scalar($value)) {
             return null;
         }
-        $str = trim(preg_replace('/\s+/u', ' ', (string) $value) ?? '');
+        $raw = (string) $value;
+        // Props are plain text; blocks escape them, so HTML would show up as literal tags.
+        if (str_contains($raw, '<') && preg_match('/<\/?[a-z][^>]*>/i', $raw)) {
+            $raw = strip_tags($raw);
+            $this->fixes[] = 'Removed HTML from a text field';
+        }
+        $str = trim(preg_replace('/\s+/u', ' ', $raw) ?? '');
 
         return $str === '' ? null : $str;
+    }
+
+    /**
+     * Models sometimes put "<img src=… alt=…>" into the brand when asked for a logo.
+     * Move a real image URL into `logo` and keep the alt text as the brand name.
+     */
+    private function rescueLogo(array $props): array
+    {
+        $brand = $props['brand'] ?? null;
+        if (!is_string($brand) || !preg_match('/<img\b[^>]*>/i', $brand, $tag)) {
+            return $props;
+        }
+        if (preg_match('/\bsrc\s*=\s*["\']([^"\']+)["\']/i', $tag[0], $src) && preg_match('#^(https?:)?//|^/#i', $src[1]) && empty($props['logo'])) {
+            $props['logo'] = $src[1];
+        }
+        $alt = preg_match('/\balt\s*=\s*["\']([^"\']*)["\']/i', $tag[0], $m) ? $m[1] : '';
+        $alt = trim(preg_replace('/\s*\blogo\b\s*$/i', '', $alt));
+        $text = trim(strip_tags(str_replace($tag[0], '', $brand)));
+        $props['brand'] = $text !== '' ? $text : $alt;
+        $this->fixes[] = 'Moved a logo out of the brand text';
+
+        return $props;
     }
 
     /** Layout sanity rules that make generated sections look right. */

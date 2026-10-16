@@ -1,9 +1,14 @@
 <nav id="main-nav" class="fixed top-0 left-0 right-0 z-50 w-full" style="background-color: var(--bg); color: var(--text); font-family: var(--font-body);">
     <!-- Main bar -->
     <div class="flex items-center justify-between px-6 py-4" style="box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
-        <div class="text-xl font-bold" style="font-family: var(--font-heading);">
-            {{ $props['brand'] ?? 'Brand' }}
-        </div>
+        <a href="#" class="flex min-w-0 items-center gap-3" style="color: inherit; text-decoration: none;">
+            @if(!empty($props['logo']))
+                <img src="{{ $props['logo'] }}" alt="{{ $props['brand'] ?? 'Logo' }}" style="height: 2.25rem; width: auto; max-width: 240px; object-fit: contain;">
+            @endif
+            @if(empty($props['logo']) || (!empty($props['brand']) && empty($props['hideBrandText'])))
+                <span class="text-xl font-bold" style="font-family: var(--font-heading);">{{ $props['brand'] ?? 'Brand' }}</span>
+            @endif
+        </a>
 
         <!-- Desktop links -->
         <div class="hidden md:flex items-center gap-6">

@@ -8,6 +8,7 @@ use App\Services\Ai\AiException;
 use App\Services\Ai\BlockCatalog;
 use App\Services\Ai\Prompts;
 use App\Services\Ai\SchemaNormalizer;
+use App\Services\Logo\LogoDesigner;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Exceptions\ErrorException;
 use OpenAI\Exceptions\RateLimitException;
@@ -31,6 +32,7 @@ class AiWebsiteService
         private SchemaValidator $validator,
         private ImageResolver $imageResolver,
         private SchemaNormalizer $normalizer,
+        private LogoDesigner $logoDesigner,
     ) {}
 
     /**
@@ -147,6 +149,50 @@ class AiWebsiteService
         $updated = $this->imageResolver->resolvePlaceholders(['sections' => [$updated]], $type)['sections'][0];
 
         return ['section' => $updated, 'summary' => $this->summary($result['data']['summary'] ?? null)];
+    }
+
+    /**
+     * Design 4 logo concepts for the navbar and render them as SVG.
+     * Falls back to built-in concepts if the AI is unavailable, so the user always gets options.
+     *
+     * @return array{concepts: array<int, array{spec: array, svg: string}>, summary: string}
+     */
+    public function logoConcepts(string $brand, array $theme, string $background, string $instruction = '', string $context = ''): array
+    {
+        $brief = [
+            'brand' => $brand,
+            'about the business' => $context,
+            'site theme' => array_intersect_key($theme, array_flip(['primaryColor', 'secondaryColor', 'textColor', 'fontHeading', 'fontBody', 'mode'])),
+            'navbar background' => $background,
+            'user direction' => $instruction !== '' ? $instruction : 'none — use your judgement',
+        ];
+
+        try {
+            $result = $this->requestJson(
+                model: config('ai.models.edit'),
+                messages: [
+                    ['role' => 'system', 'content' => LogoDesigner::prompt()],
+                    ['role' => 'user', 'content' => json_encode($brief, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)],
+                ],
+                schemaName: 'logo_concepts',
+                schema: LogoDesigner::schema(),
+                maxTokens: 2000,
+                temperature: 0.9,
+            );
+            $concepts = $result['data']['concepts'] ?? [];
+            $summary = $this->summary($result['data']['summary'] ?? null);
+        } catch (AiException $e) {
+            Log::warning('Logo concepts fell back to defaults', ['error' => $e->getMessage()]);
+            $concepts = [];
+            $summary = 'Here are a few clean starting points.';
+        }
+
+        $built = $this->logoDesigner->build($concepts, $brand, $theme, $background);
+        if (count($built) < 4) {
+            $built = array_slice(array_merge($built, $this->logoDesigner->build($this->logoDesigner->fallbackConcepts($theme), $brand, $theme, $background)), 0, 4);
+        }
+
+        return ['concepts' => $built, 'summary' => $summary];
     }
 
     /* ==================================================================

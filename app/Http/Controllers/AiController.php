@@ -7,6 +7,9 @@ use App\Models\PageVersion;
 use App\Models\Project;
 use App\Services\Ai\AiException;
 use App\Services\AiWebsiteService;
+use App\Services\Logo\LogoDesigner;
+use App\Services\Logo\LogoRenderer;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -75,6 +78,64 @@ class AiController extends Controller
             $request->theme,
             $request->user()->id,
         ), allowStream: false);
+    }
+
+    /** Design 4 navbar logo concepts (SVG previews). */
+    public function logo(Request $request, AiWebsiteService $ai)
+    {
+        $data = $request->validate([
+            'project_id' => 'required|exists:projects,id',
+            'brand' => 'required|string|max:60',
+            'theme' => 'required|array',
+            'background' => 'nullable|string|max:20',
+            'instruction' => 'nullable|string|max:500',
+        ]);
+        $project = Project::findOrFail($data['project_id']);
+        abort_if($project->user_id !== $request->user()->id, 403);
+
+        $theme = $data['theme'];
+        $context = trim(($project->name ?? '') . '. ' . ($project->description ?? ''));
+
+        return $this->respond($request, fn () => $ai->logoConcepts(
+            brand: $data['brand'],
+            theme: $theme,
+            background: $data['background'] ?? ($theme['backgroundColor'] ?? '#ffffff'),
+            instruction: $data['instruction'] ?? '',
+            context: $context,
+        ), allowStream: false);
+    }
+
+    /**
+     * Save a chosen logo. The SVG is re-rendered on the server from the validated
+     * spec — SVG markup from the browser is never stored.
+     */
+    public function saveLogo(Request $request, Project $project, LogoDesigner $designer, LogoRenderer $renderer)
+    {
+        abort_if($project->user_id !== $request->user()->id, 403);
+        $data = $request->validate([
+            'spec' => 'required|array',
+            'brand' => 'required|string|max:60',
+            'theme' => 'required|array',
+            'background' => 'nullable|string|max:20',
+        ]);
+
+        $spec = $designer->normalize($data['spec'], $data['brand'], $data['theme'], $data['background'] ?? '#ffffff');
+        $svg = $renderer->render($spec, $data['brand']);
+
+        $path = "assets/{$project->id}/logo-" . substr(md5($svg), 0, 12) . '.svg';
+        Storage::disk('public')->put($path, $svg);
+
+        $asset = $project->assets()->create([
+            'url' => '/storage/' . $path,
+            'type' => 'image',
+            'meta' => ['original_name' => 'AI logo — ' . $spec['name'] . '.svg', 'size' => strlen($svg), 'mime' => 'image/svg+xml', 'logo' => $spec],
+        ]);
+
+        return response()->json([
+            'url' => $asset->url,
+            // Logos with the name in them make the navbar text redundant.
+            'containsName' => in_array($spec['layout'], ['icon-wordmark', 'monogram-wordmark', 'wordmark'], true),
+        ]);
     }
 
     /* ------------------------------------------------------------------ */

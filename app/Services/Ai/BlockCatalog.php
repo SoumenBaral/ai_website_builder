@@ -43,6 +43,12 @@ final class BlockCatalog
         return ['kind' => 'image', 'desc' => $desc, 'required' => $required];
     }
 
+    /** An image the user must upload themselves (e.g. a logo) — the AI never invents one. */
+    private static function upload(string $desc): array
+    {
+        return ['kind' => 'image', 'generated' => false, 'desc' => $desc, 'required' => false];
+    }
+
     private static function int(int $min, int $max, int $default, string $desc): array
     {
         return ['kind' => 'int', 'min' => $min, 'max' => $max, 'default' => $default, 'desc' => $desc, 'required' => false];
@@ -97,7 +103,9 @@ final class BlockCatalog
             'navbar' => [
                 'purpose' => 'Top navigation with brand name, 3–5 links to sections on the page and one call-to-action button. Always the first section.',
                 'props' => [
-                    'brand' => self::text('Brand / business name', true),
+                    'logo' => self::upload('Logo image URL uploaded by the user. Keep the current value exactly; never invent, describe or generate a logo — use null if there is none.'),
+                    'brand' => self::text('Brand / business name as plain text (shown next to the logo)', true),
+                    'hideBrandText' => self::flag('true when the uploaded logo already contains the name; keep the current value'),
                     'links' => self::items($link, 3, 6, '3–5 links to sections on this page'),
                     'ctaText' => self::text('Short action, e.g. "Book a call"'),
                     'ctaHref' => self::text('Usually "#contact" or "#pricing"'),
@@ -346,7 +354,7 @@ final class BlockCatalog
         };
 
         $desc = $spec['desc'] ?? '';
-        if ($spec['kind'] === 'image') {
+        if ($spec['kind'] === 'image' && ($spec['generated'] ?? true)) {
             $desc = trim("{$desc}. Value: \"PLACEHOLDER:<3–6 word English photo search query>\" for new images, or keep an existing https URL.", '. ');
         }
         if ($desc !== '') {
@@ -501,7 +509,7 @@ final class BlockCatalog
             'enum' => "{$key}{$star}: " . implode('|', $spec['values']),
             'int' => "{$key}: {$spec['min']}–{$spec['max']}",
             'bool' => "{$key}: true|false",
-            'image' => "{$key}{$star}: image",
+            'image' => ($spec['generated'] ?? true) ? "{$key}{$star}: image" : "{$key}: user-uploaded image URL (never invent)",
             'strings' => "{$key}: string[] ({$spec['desc']})",
             'list' => "{$key}: [{" . implode(', ', array_map(
                 fn ($k, $s) => self::describeProp($k, $s),

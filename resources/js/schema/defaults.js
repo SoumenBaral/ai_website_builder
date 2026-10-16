@@ -3,7 +3,9 @@ export const BLOCK_TYPES = {
         label: 'Navbar',
         icon: '🧭',
         defaultProps: {
+            logo: '',
             brand: 'My Site',
+            hideBrandText: false,
             links: [
                 { label: 'Home', href: '#' },
                 { label: 'About', href: '#about' },

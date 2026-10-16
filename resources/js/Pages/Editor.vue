@@ -14,6 +14,7 @@ import Inspector from '@/Components/builder/Inspector.vue';
 import ThemePanel from '@/Components/builder/ThemePanel.vue';
 import VersionHistory from '@/Components/builder/VersionHistory.vue';
 import EditorToasts from '@/Components/builder/EditorToasts.vue';
+import LogoStudio from '@/Components/builder/LogoStudio.vue';
 import { useToast } from '@/Components/builder/useToast';
 import Icon from '@/Components/Landing/Icon.vue';
 import ThemeToggle from '@/Components/Landing/ThemeToggle.vue';
@@ -351,6 +352,7 @@ const fontLink = computed(() => {
         </div>
 
         <VersionHistory v-if="showVersionHistory" :project-id="project.id" @close="showVersionHistory = false" />
+        <LogoStudio :project-id="project.id" />
         <EditorToasts />
     </div>
 </template>
