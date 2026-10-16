@@ -10,7 +10,8 @@ import { useToast } from './useToast';
 import { useLogoStudio } from './useLogoStudio';
 import axios from 'axios';
 import { streamAi } from './aiStream';
-import { ANIMATIONS, HOVER_EFFECTS, BUTTON_EFFECTS, TEXT_EFFECTS, replayAnimation, canonicalAnimation, ANIMATION_INTENT, aiAnimate, bgPresets, presetKeyOf } from './animPreview';
+import { ANIMATION_INTENT, aiAnimate } from './animPreview';
+import MotionPanel from './MotionPanel.vue';
 
 const projectId = inject('projectId');
 
@@ -28,28 +29,7 @@ const blockDef = computed(() => block.value ? BLOCK_TYPES[block.value.type] : nu
 const index = computed(() => (block.value ? editor.schema.sections.findIndex((s) => s.id === block.value.id) : -1));
 const total = computed(() => editor.schema?.sections?.length || 0);
 const STYLE_KEYS = ['sectionBg', 'sectionText', 'imageRadius', 'imageShadow', 'imageBorder', 'animation', 'animationSpeed', 'animationStagger', 'hoverEffect', 'buttonEffect', 'textEffect', 'textSpeed', 'typingPhrases', 'customAnimation', 'bgEffect'];
-const currentTextEffect = computed(() => block.value?.props.textEffect || 'none');
-const phrasesText = computed(() => (block.value?.props.typingPhrases || []).join('\n'));
-function setPhrases(value) {
-    update('typingPhrases', value.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 5));
-}
-// Only offer button effects where the section actually has buttons (or might, via the AI).
-const hasButtons = computed(() => {
-    const p = block.value?.props || {};
-    return ['navbar', 'hero', 'cta', 'pricing', 'contact', 'custom'].includes(block.value?.type) || !!(p.ctaText || p.buttonText || p.button || p.cta);
-});
 
-/* ---------- Background effect ---------- */
-const effectPresets = computed(() => bgPresets(editor.schema?.theme));
-const effect = computed(() => (block.value?.props.bgEffect?.kind ? block.value.props.bgEffect : null));
-const effectPreset = computed(() => presetKeyOf(effect.value, editor.schema?.theme));
-function setEffect(spec) {
-    update('bgEffect', spec ? JSON.parse(JSON.stringify(spec)) : null);
-}
-function tweakEffect(patch) {
-    if (effect.value) update('bgEffect', { ...effect.value, ...patch });
-}
-const currentAnimation = computed(() => canonicalAnimation(block.value?.props.animation) || 'none');
 // Multi-line fields are chosen by name (not length) so the control never swaps mid-typing.
 const LONG_TEXT = ['body', 'description', 'subheading', 'text', 'content', 'answer', 'quote', 'bio', 'message', 'about', 'paragraph'];
 const isLongText = (key) => LONG_TEXT.includes(String(key).toLowerCase());
@@ -564,129 +544,6 @@ const quickActions = computed(() => {
                             </div>
                         </div>
 
-                        <!-- Animation -->
-                        <div>
-                            <div class="mb-1.5 flex items-center justify-between">
-                                <label class="ed-label !mb-0">Animation</label>
-                                <button v-if="currentAnimation !== 'none'" type="button" class="inline-flex items-center gap-1 text-[11px] font-semibold text-lp-accent hover:opacity-80" @click="replayAnimation(block.id)">
-                                    <Icon name="redo" :stroke="2" class="size-3" />Preview
-                                </button>
-                            </div>
-                            <div class="grid grid-cols-3 gap-1">
-                                <button
-                                    v-for="a in ANIMATIONS"
-                                    :key="a.value"
-                                    type="button"
-                                    :class="['anim-chip', currentAnimation === a.value && 'anim-chip--active']"
-                                    @click="update('animation', a.value)"
-                                >
-                                    <span :class="['anim-glyph', `anim-glyph--${a.value}`]"></span>{{ a.label }}
-                                </button>
-                                <button v-if="currentAnimation === 'custom'" type="button" class="anim-chip anim-chip--active col-span-3 !justify-center" :title="'Designed by AI'" @click="replayAnimation(block.id)">
-                                    ✨ {{ block.props.customAnimation?.name || 'Custom' }} <span class="font-normal opacity-70">· made by AI</span>
-                                </button>
-                            </div>
-                            <template v-if="currentAnimation !== 'none'">
-                                <div class="mt-3 flex items-center gap-2">
-                                    <span class="w-12 shrink-0 text-[11px] font-medium text-lp-muted">Speed</span>
-                                    <div class="grid flex-1 grid-cols-3 gap-1">
-                                        <button v-for="sp in ['fast', 'normal', 'slow']" :key="sp" type="button" :class="['anim-chip !justify-center', (block.props.animationSpeed || 'normal') === sp && 'anim-chip--active']" @click="update('animationSpeed', sp)">{{ humanize(sp) }}</button>
-                                    </div>
-                                </div>
-                                <label class="mt-3 flex cursor-pointer items-center justify-between gap-3">
-                                    <span class="text-[11px] font-medium text-lp-muted">Show content one by one</span>
-                                    <button type="button" role="switch" :aria-checked="!!block.props.animationStagger" :class="['toggle', block.props.animationStagger && 'toggle--on']" @click="update('animationStagger', !block.props.animationStagger)"><span></span></button>
-                                </label>
-                            </template>
-                            <div class="mt-3 flex items-center gap-2">
-                                <span class="w-12 shrink-0 text-[11px] font-medium text-lp-muted">Hover</span>
-                                <div class="grid flex-1 grid-cols-4 gap-1">
-                                    <button v-for="h in HOVER_EFFECTS" :key="h.value" type="button" :title="h.value === 'none' ? 'No hover effect' : `${h.label} on cards and photos`" :class="['anim-chip !justify-center !px-1', (block.props.hoverEffect || 'none') === h.value && 'anim-chip--active']" @click="update('hoverEffect', h.value)">{{ h.value === 'zoom' ? 'Zoom' : h.label }}</button>
-                                </div>
-                            </div>
-                            <p class="mt-2 text-[11px] text-lp-subtle">The content animates in as visitors scroll here; the background stays still. Or ask the AI, e.g. “slide this in from the left, one by one”.</p>
-                        </div>
-
-                        <!-- Heading effect -->
-                        <div>
-                            <div class="mb-1.5 flex items-center justify-between">
-                                <label class="ed-label !mb-0">Heading effect</label>
-                                <button v-if="currentTextEffect !== 'none'" type="button" class="inline-flex items-center gap-1 text-[11px] font-semibold text-lp-accent hover:opacity-80" @click="replayAnimation(block.id)">
-                                    <Icon name="redo" :stroke="2" class="size-3" />Preview
-                                </button>
-                            </div>
-                            <div class="grid grid-cols-2 gap-1">
-                                <button v-for="t in TEXT_EFFECTS" :key="t.value" type="button" :title="t.hint" :class="['anim-chip', t.value === 'none' && 'col-span-2 !justify-center', currentTextEffect === t.value && 'anim-chip--active']" @click="update('textEffect', t.value)">
-                                    <span v-if="t.value !== 'none'" class="tx-demo" :data-demo="t.value">Aa</span>{{ t.label }}
-                                </button>
-                            </div>
-                            <template v-if="currentTextEffect !== 'none'">
-                                <div v-if="currentTextEffect !== 'gradient'" class="mt-3 flex items-center gap-2">
-                                    <span class="w-12 shrink-0 text-[11px] font-medium text-lp-muted">Speed</span>
-                                    <div class="grid flex-1 grid-cols-3 gap-1">
-                                        <button v-for="sp in ['fast', 'normal', 'slow']" :key="sp" type="button" :class="['anim-chip !justify-center', (block.props.textSpeed || 'normal') === sp && 'anim-chip--active']" @click="update('textSpeed', sp)">{{ humanize(sp) }}</button>
-                                    </div>
-                                </div>
-                                <div v-if="currentTextEffect === 'typing-loop'" class="mt-3">
-                                    <label class="ed-label !text-[11px]">Phrases typed after your heading</label>
-                                    <textarea :value="phrasesText" rows="3" placeholder="One per line, e.g.&#10;Brands that stand out&#10;Stores that grow" class="ed-textarea ed-input-sm" @change="setPhrases($event.target.value)"></textarea>
-                                    <p v-if="!block.props.typingPhrases?.length" class="mt-1 text-[11px] text-amber-600">Add a few phrases (or ask the AI to write them) — otherwise it just retypes the heading.</p>
-                                </div>
-                            </template>
-                            <p class="mt-1.5 text-[11px] text-lp-subtle">{{ TEXT_EFFECTS.find((t) => t.value === currentTextEffect)?.hint }}{{ currentTextEffect !== 'none' ? ' — on this section\'s main heading.' : '.' }}</p>
-                        </div>
-
-                        <!-- Button effect -->
-                        <div v-if="hasButtons || (block.props.buttonEffect && block.props.buttonEffect !== 'none')">
-                            <label class="ed-label">Button effect</label>
-                            <div class="grid grid-cols-4 gap-1">
-                                <button v-for="b in BUTTON_EFFECTS" :key="b.value" type="button" :title="b.hint" :class="['anim-chip !justify-center', (block.props.buttonEffect || 'none') === b.value && 'anim-chip--active']" @click="update('buttonEffect', b.value)">
-                                    <span v-if="b.value !== 'none'" :class="['btn-demo', `btn-demo--${b.value}`]"></span>{{ b.label }}
-                                </button>
-                            </div>
-                            <p class="mt-1.5 text-[11px] text-lp-subtle">{{ BUTTON_EFFECTS.find((b) => b.value === (block.props.buttonEffect || 'none'))?.hint }} — on every button in this section.</p>
-                        </div>
-
-                        <!-- Background effect -->
-                        <div>
-                            <label class="ed-label">Background effect</label>
-                            <div class="grid grid-cols-2 gap-1">
-                                <button type="button" :class="['anim-chip', !effect && 'anim-chip--active']" @click="setEffect(null)"><span class="w-4 text-center">⊘</span>None</button>
-                                <button v-for="p in effectPresets" :key="p.key" type="button" :class="['anim-chip', effectPreset === p.key && 'anim-chip--active']" @click="setEffect(p.spec)">
-                                    <span class="w-4 text-center">{{ p.icon }}</span><span class="truncate">{{ p.label }}</span>
-                                </button>
-                                <div v-if="effect && effectPreset === null" class="anim-chip anim-chip--active col-span-2 !justify-center">✨ {{ effect.name }} <span class="font-normal opacity-70">· made by AI</span></div>
-                            </div>
-                            <div v-if="effect" class="mt-3 space-y-2.5 rounded-xl border border-lp-ink/[0.07] p-3">
-                                <div v-if="effect.kind === 'particles'" class="flex items-center gap-2">
-                                    <span class="w-14 shrink-0 text-[11px] font-medium text-lp-muted">Amount</span>
-                                    <input type="range" min="3" max="120" :value="effect.count" class="flex-1 accent-violet-500" @change="tweakEffect({ count: Number($event.target.value) })" />
-                                    <span class="w-7 text-right text-[11px] tabular-nums text-lp-subtle">{{ effect.count }}</span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="w-14 shrink-0 text-[11px] font-medium text-lp-muted">Strength</span>
-                                    <input type="range" min="5" max="100" :value="effect.opacity" class="flex-1 accent-violet-500" @change="tweakEffect({ opacity: Number($event.target.value) })" />
-                                    <span class="w-7 text-right text-[11px] tabular-nums text-lp-subtle">{{ effect.opacity }}%</span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="w-14 shrink-0 text-[11px] font-medium text-lp-muted">Speed</span>
-                                    <div class="grid flex-1 grid-cols-3 gap-1">
-                                        <button v-for="sp in ['slow', 'normal', 'fast']" :key="sp" type="button" :class="['anim-chip !justify-center', (effect.speed || 'normal') === sp && 'anim-chip--active']" @click="tweakEffect({ speed: sp })">{{ humanize(sp) }}</button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="w-14 shrink-0 text-[11px] font-medium text-lp-muted">Colours</span>
-                                    <div class="flex flex-1 items-center gap-1.5">
-                                        <input v-for="(c, ci) in effect.colors" :key="ci" type="color" :value="c" class="ed-color !size-7" @change="tweakEffect({ colors: effect.colors.map((x, xi) => (xi === ci ? $event.target.value : x)) })" />
-                                    </div>
-                                    <label v-if="effect.kind === 'particles'" class="flex items-center gap-1.5 text-[11px] text-lp-muted">Glow
-                                        <button type="button" role="switch" :aria-checked="!!effect.glow" :class="['toggle', effect.glow && 'toggle--on']" @click="tweakEffect({ glow: !effect.glow })"><span></span></button>
-                                    </label>
-                                </div>
-                            </div>
-                            <p class="mt-2 text-[11px] text-lp-subtle">Want something else? Ask the AI — e.g. “falling 🍂 leaves over the hero” or “soft purple glow behind the pricing”.</p>
-                        </div>
-
                         <div v-if="hasImageStyle" class="grid grid-cols-3 gap-2">
                             <div>
                                 <label class="ed-label">Image radius</label>
@@ -709,85 +566,23 @@ const quickActions = computed(() => {
                         </div>
                     </div>
                 </details>
+
+                <!-- Motion: entrance, heading, buttons, hover, background -->
+                <details class="group/motion border-t border-lp-ink/[0.07] pt-5" open>
+                    <summary class="flex cursor-pointer list-none items-center justify-between">
+                        <h4 class="ed-heading">Motion</h4>
+                        <Icon name="chevronDown" :stroke="2" class="size-4 text-lp-subtle transition-transform group-open/motion:rotate-180" />
+                    </summary>
+                    <div class="mt-4">
+                        <MotionPanel :block="block" @ask="askAi" />
+                    </div>
+                </details>
             </div>
         </div>
     </div>
 </template>
 
 <style scoped>
-.anim-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    min-width: 0;
-    border-radius: 0.5rem;
-    border: 1px solid rgb(var(--lp-ink) / 0.09);
-    background: rgb(var(--lp-ink) / 0.02);
-    padding: 0.4rem 0.45rem;
-    font-size: 11px;
-    font-weight: 500;
-    white-space: nowrap;
-    color: rgb(var(--lp-muted));
-    transition: border-color 0.15s, background-color 0.15s, color 0.15s;
-}
-.anim-chip:hover { border-color: rgb(139 92 246 / 0.4); color: rgb(var(--lp-text)); }
-.anim-chip--active { border-color: #8b5cf6; background: rgb(139 92 246 / 0.1); color: rgb(var(--lp-accent)); font-weight: 600; }
-/* Tiny looping demo of each animation */
-.anim-glyph {
-    width: 0.6rem;
-    height: 0.6rem;
-    flex-shrink: 0;
-    border-radius: 0.15rem;
-    background: currentColor;
-    opacity: 0.75;
-}
-.anim-chip:hover .anim-glyph, .anim-chip--active .anim-glyph { animation: 1.4s cubic-bezier(0.16, 1, 0.3, 1) infinite var(--glyph); }
-.anim-glyph--none { background: none; border: 1.5px solid currentColor; }
-.anim-glyph--fade { --glyph: g-fade; }
-.anim-glyph--fade-up { --glyph: g-up; }
-.anim-glyph--fade-down { --glyph: g-down; }
-.anim-glyph--from-right { --glyph: g-left; }
-.anim-glyph--from-left { --glyph: g-right; }
-.anim-glyph--zoom { --glyph: g-zoom; }
-.anim-glyph--blur { --glyph: g-blur; }
-.anim-glyph--flip { --glyph: g-flip; }
-@keyframes g-fade { 0% { opacity: 0; } 60%, 100% { opacity: 0.75; } }
-@keyframes g-up { 0% { opacity: 0; transform: translateY(5px); } 60%, 100% { opacity: 0.75; transform: none; } }
-@keyframes g-down { 0% { opacity: 0; transform: translateY(-5px); } 60%, 100% { opacity: 0.75; transform: none; } }
-@keyframes g-left { 0% { opacity: 0; transform: translateX(6px); } 60%, 100% { opacity: 0.75; transform: none; } }
-@keyframes g-right { 0% { opacity: 0; transform: translateX(-6px); } 60%, 100% { opacity: 0.75; transform: none; } }
-@keyframes g-zoom { 0% { opacity: 0; transform: scale(0.4); } 60%, 100% { opacity: 0.75; transform: none; } }
-@keyframes g-blur { 0% { opacity: 0; filter: blur(3px); } 60%, 100% { opacity: 0.75; filter: none; } }
-@keyframes g-flip { 0% { opacity: 0; transform: perspective(40px) rotateX(60deg); } 60%, 100% { opacity: 0.75; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .anim-glyph { animation: none !important; } }
-/* Mini heading demos */
-.tx-demo { display: inline-block; width: 1.1rem; flex-shrink: 0; font-size: 10px; font-weight: 700; line-height: 1; text-align: center; }
-.anim-chip:hover .tx-demo[data-demo='typing'], .anim-chip--active .tx-demo[data-demo='typing'],
-.anim-chip:hover .tx-demo[data-demo='typing-loop'], .anim-chip--active .tx-demo[data-demo='typing-loop'] { overflow: hidden; white-space: nowrap; animation: demo-type 1.6s steps(2) infinite; }
-.anim-chip:hover .tx-demo[data-demo='words'], .anim-chip--active .tx-demo[data-demo='words'] { animation: g-up 1.4s ease infinite; }
-.anim-chip:hover .tx-demo[data-demo='letters'], .anim-chip--active .tx-demo[data-demo='letters'] { animation: g-down 1.4s ease infinite; }
-.tx-demo[data-demo='gradient'] { background: linear-gradient(90deg, currentColor, #a78bfa, currentColor); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-.anim-chip:hover .tx-demo[data-demo='gradient'], .anim-chip--active .tx-demo[data-demo='gradient'] { animation: demo-grad 1.5s linear infinite; }
-.tx-demo[data-demo='highlight'] { background: linear-gradient(rgb(139 92 246 / 0.35), rgb(139 92 246 / 0.35)) no-repeat 0 90% / 100% 40%; }
-@keyframes demo-type { from { width: 0; } to { width: 1.1rem; } }
-@keyframes demo-grad { to { background-position: 200% 0; } }
-@media (prefers-reduced-motion: reduce) { .tx-demo { animation: none !important; width: 1.1rem !important; } }
-/* Mini button demos in the effect chips */
-.btn-demo { position: relative; display: inline-block; width: 0.75rem; height: 0.45rem; flex-shrink: 0; overflow: hidden; border-radius: 0.15rem; background: currentColor; opacity: 0.8; }
-.anim-chip:hover .btn-demo--pulse, .anim-chip--active .btn-demo--pulse { overflow: visible; animation: demo-pulse 1.4s ease-out infinite; }
-.btn-demo--shine::after { content: ''; position: absolute; inset: 0 auto 0 -60%; width: 40%; background: rgb(255 255 255 / 0.85); transform: skewX(-20deg); }
-.anim-chip:hover .btn-demo--shine::after, .anim-chip--active .btn-demo--shine::after { animation: demo-shine 1.4s ease-in-out infinite; }
-.anim-chip:hover .btn-demo--glow, .anim-chip--active .btn-demo--glow { overflow: visible; animation: demo-glow 1.2s ease-in-out infinite alternate; }
-.anim-chip:hover .btn-demo--bounce, .anim-chip--active .btn-demo--bounce { animation: demo-bounce 1.2s ease infinite; }
-.anim-chip:hover .btn-demo--wiggle, .anim-chip--active .btn-demo--wiggle { animation: demo-wiggle 1.2s ease-in-out infinite; }
-.anim-chip:hover .btn-demo--pop, .anim-chip--active .btn-demo--pop { animation: demo-pop 1.2s ease infinite; }
-@keyframes demo-pulse { from { box-shadow: 0 0 0 0 currentColor; } to { box-shadow: 0 0 0 5px transparent; } }
-@keyframes demo-shine { 0% { left: -60%; } 60%, 100% { left: 130%; } }
-@keyframes demo-glow { from { box-shadow: 0 0 1px currentColor; } to { box-shadow: 0 0 7px currentColor; } }
-@keyframes demo-bounce { 0%, 40%, 100% { transform: translateY(0); } 20% { transform: translateY(-3px); } }
-@keyframes demo-wiggle { 0%, 50%, 100% { transform: rotate(0); } 15% { transform: rotate(-12deg); } 35% { transform: rotate(12deg); } }
-@keyframes demo-pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
-@media (prefers-reduced-motion: reduce) { .btn-demo, .btn-demo::after { animation: none !important; } }
 .ai-card {
     border: 1px solid rgb(139 92 246 / 0.25);
     background: linear-gradient(180deg, rgb(139 92 246 / 0.09), rgb(139 92 246 / 0.02));
