@@ -23,7 +23,7 @@
                         @endif
                         <div class="p-6">
                             @if(!empty($item['icon']))
-                                <div class="text-4xl mb-4" style="color: var(--primary);">{!! $item['icon'] !!}</div>
+                                <div class="text-4xl mb-4" style="color: var(--primary);">{{ $item['icon'] }}</div>
                             @endif
                             <h3 class="text-xl font-semibold mb-2" style="font-family: var(--font-heading);">{{ $item['title'] ?? '' }}</h3>
                             <p class="opacity-80">{{ $item['description'] ?? '' }}</p>

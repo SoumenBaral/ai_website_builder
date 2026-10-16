@@ -59,3 +59,35 @@ export function singular(key) {
     if (k.endsWith('s')) return k.slice(0, -1);
     return k;
 }
+
+/**
+ * Every field a list item can have, per block and list (mirrors app/Services/Ai/BlockCatalog.php).
+ * The Inspector shows all of them — even ones an item doesn't have yet — so you can
+ * always add an image, price, avatar, etc.
+ */
+export const ITEM_FIELDS = {
+    navbar: { links: ['label', 'href'] },
+    features: { items: ['icon', 'image', 'title', 'description'] },
+    services: { items: ['icon', 'image', 'title', 'description', 'price'] },
+    gallery: { images: ['src', 'caption'] },
+    testimonials: { items: ['quote', 'author', 'role', 'avatar'] },
+    pricing: { plans: ['name', 'price', 'period', 'ctaText', 'highlighted'] },
+    stats: { items: ['value', 'label'] },
+    faq: { items: ['question', 'answer'] },
+    team: { members: ['image', 'name', 'role', 'bio'] },
+    footer: { links: ['label', 'href'], socials: ['platform', 'url'] },
+};
+
+/** Lists whose cards can show an icon or a photo. */
+export const CARD_VISUAL_LISTS = { features: 'items', services: 'items' };
+
+export function itemFields(blockType, listKey, items = []) {
+    const known = ITEM_FIELDS[blockType]?.[listKey] || [];
+    const extra = [];
+    for (const item of items) {
+        for (const key of Object.keys(item || {})) {
+            if (!known.includes(key) && !extra.includes(key)) extra.push(key);
+        }
+    }
+    return [...known, ...extra];
+}

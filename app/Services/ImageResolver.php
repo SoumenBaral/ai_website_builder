@@ -58,6 +58,30 @@ class ImageResolver
         return $schema;
     }
 
+    /**
+     * Photos for a list of search queries (e.g. product titles), without repeating
+     * each other or any photo in $exclude. Costs no AI tokens.
+     *
+     * @param string[] $queries
+     * @param string[] $exclude URLs already on the page
+     * @return array<int, string|null> one URL per query (null when nothing relevant was found)
+     */
+    public function photosFor(array $queries, string $siteHint = '', array $exclude = [], string $placement = 'card'): array
+    {
+        $this->used = [];
+        $this->siteHint = strtolower($siteHint);
+        foreach ($exclude as $url) {
+            if (is_string($url) && preg_match('#images\.unsplash\.com/photo-([\w-]+)#', $url, $m)) {
+                $this->used[$m[1]] = true;
+            }
+        }
+
+        return array_map(
+            fn ($q) => is_string($q) && trim($q) !== '' ? $this->resolve(strtolower(trim($q)), $placement, optional: true, minFresh: 0.75) : null,
+            array_values($queries),
+        );
+    }
+
     public function resolveSection(array $section): array
     {
         $type = $section['type'] ?? '';
@@ -111,7 +135,7 @@ class ImageResolver
     }
 
     /** @param bool $optional Return null instead of an unrelated fallback photo. */
-    private function resolve(string $query, string $placement, bool $optional = false): ?string
+    private function resolve(string $query, string $placement, bool $optional = false, float $minFresh = 2.5): ?string
     {
         if ($placement !== 'portrait' && config('ai.unsplash_access_key')) {
             $url = $this->searchUnsplash($query, $placement);
@@ -120,7 +144,7 @@ class ImageResolver
             }
         }
 
-        $id = $placement === 'portrait' ? $this->pickPortrait($query) : $this->pickPhoto($query, $placement, $optional);
+        $id = $placement === 'portrait' ? $this->pickPortrait($query) : $this->pickPhoto($query, $placement, $optional, $minFresh);
         if ($id === null) {
             return null;
         }
@@ -184,10 +208,14 @@ class ImageResolver
         return count(array_intersect($tags, $hintTokens));
     }
 
-    private function pickPhoto(string $query, string $placement, bool $optional = false): ?string
+    private function pickPhoto(string $query, string $placement, bool $optional = false, float $minFresh = 2.5): ?string
     {
         $queryTokens = $this->tokens($query);
         $hintTokens = $this->tokens($this->siteHint);
+
+        // Off-topic photos are only wrong when the query is about the business itself
+        // ("modern dental clinic interior" on a dental site) — not for specific products ("sneakers").
+        $queryAboutBusiness = (bool) array_intersect($queryTokens, $hintTokens);
 
         // Does the library cover this business's domain at all (e.g. dental, restaurant)?
         $domainKnown = false;
@@ -204,7 +232,7 @@ class ImageResolver
             $score = $this->queryScore($tags, $queryTokens) + 0.75 * $overlap;
             // A photo unrelated to the business (a living room on a dental site) is a poor match
             // even if one query word fits.
-            if ($domainKnown && $overlap === 0) {
+            if ($domainKnown && $queryAboutBusiness && $overlap === 0) {
                 $score *= 0.5;
             }
             if ($score > 0) {
@@ -223,7 +251,7 @@ class ImageResolver
         $fresh = array_filter($scores, fn ($s, $id) => !isset($this->used[$id]), ARRAY_FILTER_USE_BOTH);
 
         // 1. A good photo not yet used on this site.
-        if ($fresh && max($fresh) >= 2.5) {
+        if ($fresh && max($fresh) >= $minFresh) {
             return $pickTop($fresh);
         }
         // Decorative images: never repeat, never settle — leave them out.

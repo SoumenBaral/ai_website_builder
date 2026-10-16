@@ -80,6 +80,22 @@ class AiController extends Controller
         ), allowStream: false);
     }
 
+    /** Matching photos for card titles ("Oxford shirt", "Wool scarf"…). No AI tokens used. */
+    public function photos(Request $request, \App\Services\ImageResolver $images)
+    {
+        $data = $request->validate([
+            'queries' => 'required|array|max:12',
+            'queries.*' => 'nullable|string|max:120',
+            'hint' => 'nullable|string|max:300',
+            'exclude' => 'nullable|array|max:100',
+            'exclude.*' => 'nullable|string|max:500',
+        ]);
+
+        return response()->json([
+            'urls' => $images->photosFor($data['queries'], $data['hint'] ?? '', $data['exclude'] ?? []),
+        ]);
+    }
+
     /** Design 4 navbar logo concepts (SVG previews). */
     public function logo(Request $request, AiWebsiteService $ai)
     {

@@ -5,7 +5,7 @@ import { BLOCK_TYPES } from '@/schema/defaults.js';
 import ImagePicker from '@/Components/builder/ImagePicker.vue';
 import CustomElementEditor from '@/Components/builder/CustomElementEditor.vue';
 import Icon from '@/Components/Landing/Icon.vue';
-import { blockIcons, humanize, singular } from './blockMeta';
+import { blockIcons, humanize, singular, ITEM_FIELDS, CARD_VISUAL_LISTS, itemFields } from './blockMeta';
 import { useToast } from './useToast';
 import { useLogoStudio } from './useLogoStudio';
 import axios from 'axios';
@@ -30,6 +30,78 @@ const STYLE_KEYS = ['sectionBg', 'sectionText', 'imageRadius', 'imageShadow', 'i
 // Multi-line fields are chosen by name (not length) so the control never swaps mid-typing.
 const LONG_TEXT = ['body', 'description', 'subheading', 'text', 'content', 'answer', 'quote', 'bio', 'message', 'about', 'paragraph'];
 const isLongText = (key) => LONG_TEXT.includes(String(key).toLowerCase());
+/* ---------- Lists ---------- */
+const isObjectList = (key, value) => (value.length ? typeof value[0] === 'object' : !!ITEM_FIELDS[block.value?.type]?.[key]);
+
+/** Which visual the cards use: inferred from the items themselves. */
+function cardVisual(items) {
+    if (items.some((it) => it.image)) return 'photo';
+    if (items.some((it) => it.icon)) return 'icon';
+    return 'none';
+}
+
+function visibleItemFields(key, items) {
+    let fields = itemFields(block.value.type, key, items);
+    if (CARD_VISUAL_LISTS[block.value.type] === key) {
+        const mode = cardVisual(items);
+        fields = fields.filter((f) => (f === 'icon' ? mode === 'icon' : f === 'image' ? mode === 'photo' : true));
+    }
+    return fields;
+}
+
+function addItem(key, items) {
+    const template = Object.fromEntries(itemFields(block.value.type, key, items).map((f) => [f, f === 'highlighted' ? false : '']));
+    // Keep the new card consistent with the others
+    if (CARD_VISUAL_LISTS[block.value.type] === key && cardVisual(items) === 'icon') template.icon = '✨';
+    addArrayItem(key, template);
+}
+
+const fillingPhotos = ref(false);
+
+/** Switch every card to icon / photo / nothing (removes the other so cards never show both). */
+async function setCardVisual(key, items, mode) {
+    const next = items.map((it) => {
+        const copy = { ...it };
+        if (mode !== 'photo') delete copy.image;
+        if (mode !== 'icon') delete copy.icon;
+        if (mode === 'icon' && !copy.icon) copy.icon = '✨';
+        return copy;
+    });
+    update(key, next);
+    if (mode === 'photo') await fillPhotos(key, next, true);
+}
+
+/** Pick matching, non-repeating photos from each card's title (no AI tokens used). */
+async function fillPhotos(key, items, onlyMissing = true) {
+    // Fill only empty cards, or (when all have photos) find fresh alternatives for every card.
+    const targets = items.map((it, i) => ({ it, i })).filter(({ it }) => !onlyMissing || !it.image);
+    if (!targets.length) return;
+    fillingPhotos.value = true;
+    try {
+        const pageImages = JSON.stringify(editor.schema).match(/https:\/\/images\.unsplash\.com\/[^"]+/g) || [];
+        const meta = editor.schema.meta || {};
+        const { data } = await axios.post(route('ai.photos'), {
+            queries: targets.map(({ it }) => [it.title || it.name || '', it.description || ''].join(' ').slice(0, 120)),
+            hint: [meta.title, meta.description].filter(Boolean).join(' ').slice(0, 300),
+            exclude: pageImages.slice(0, 100), // never repeat a photo already on the page
+        });
+        const next = items.map((it) => ({ ...it }));
+        let filled = 0;
+        targets.forEach(({ i }, n) => {
+            if (data.urls[n]) {
+                next[i].image = data.urls[n];
+                filled++;
+            }
+        });
+        update(key, next);
+        notify(filled ? `Added ${filled} matching photo${filled === 1 ? '' : 's'} — click any card to change it.` : 'No good matches found — upload your own photos instead.', filled ? 'success' : 'info');
+    } catch (e) {
+        notify(e.response?.data?.message || 'Could not find photos right now.', 'error');
+    } finally {
+        fillingPhotos.value = false;
+    }
+}
+
 // Fields every block of a type should offer, even if older saved sections don't have them yet.
 const OFFERED_FIELDS = { navbar: { logo: '', hideBrandText: false } };
 const displayProps = computed(() => (block.value ? { ...(OFFERED_FIELDS[block.value.type] || {}), ...block.value.props } : {}));
@@ -367,38 +439,65 @@ const quickActions = computed(() => {
                         </div>
 
                         <!-- Lists of objects (links, features, plans…) -->
-                        <div v-else-if="Array.isArray(value) && value.length && typeof value[0] === 'object'">
+                        <div v-else-if="Array.isArray(value) && (isObjectList(key, value))">
                             <div class="mb-2 flex items-center justify-between">
                                 <label class="ed-label !mb-0">{{ humanize(key) }} <span class="text-lp-subtle">· {{ value.length }}</span></label>
                             </div>
+
+                            <!-- Card visual: icon, photo or nothing -->
+                            <div v-if="CARD_VISUAL_LISTS[block.type] === key" class="visual-box mb-3">
+                                <div class="text-[11px] font-medium text-lp-muted">Card visual</div>
+                                <div class="mt-1.5 grid grid-cols-3 gap-1">
+                                    <button v-for="m in [{ k: 'icon', l: 'Icon', i: 'sparkles' }, { k: 'photo', l: 'Photo', i: 'photo' }, { k: 'none', l: 'None', i: 'xMark' }]" :key="m.k" type="button"
+                                        :class="['ed-option !py-1.5', cardVisual(value) === m.k && 'ed-option--active']" :disabled="fillingPhotos" @click="setCardVisual(key, value, m.k)">
+                                        <Icon :name="m.i" :stroke="1.8" class="size-3.5" />{{ m.l }}
+                                    </button>
+                                </div>
+                                <button v-if="cardVisual(value) === 'photo'" type="button" class="logo-ai-btn mt-2" :disabled="fillingPhotos" @click="fillPhotos(key, value, value.some((it) => !it.image))">
+                                    <svg v-if="fillingPhotos" viewBox="0 0 24 24" fill="none" class="size-4 animate-spin"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg>
+                                    <Icon v-else name="sparkles" :stroke="1.8" class="size-4" />
+                                    {{ value.some((it) => !it.image) ? 'Fill missing photos to match each card' : 'Find new matching photos' }}
+                                </button>
+                            </div>
+
                             <div class="space-y-2">
                                 <details v-for="(item, i) in value" :key="i" class="ed-item group/item" :open="value.length <= 3">
                                     <summary class="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium text-lp-text">
                                         <Icon name="chevronDown" :stroke="2" class="size-3.5 -rotate-90 text-lp-subtle transition-transform group-open/item:rotate-0" />
-                                        <span class="min-w-0 flex-1 truncate">{{ item.title || item.label || item.name || item.question || item.value || item.alt || `${singular(key)} ${i + 1}` }}</span>
+                                        <img v-if="item.image || item.avatar || item.src" :src="item.image || item.avatar || item.src" alt="" class="size-6 shrink-0 rounded object-cover" />
+                                        <span v-else-if="item.icon" class="w-6 shrink-0 text-center text-sm">{{ item.icon }}</span>
+                                        <span class="min-w-0 flex-1 truncate">{{ item.title || item.label || item.name || item.question || item.value || item.author || item.caption || `${singular(key)} ${i + 1}` }}</span>
                                         <button type="button" class="ed-icon-btn ed-icon-btn--danger size-6" :title="`Remove ${singular(key)}`" @click.prevent="removeArrayItem(key, i)"><Icon name="xMark" :stroke="2" class="size-3.5" /></button>
                                     </summary>
                                     <div class="space-y-2.5 border-t border-lp-ink/[0.06] px-3 pb-3 pt-2.5">
-                                        <div v-for="(val, field) in item" :key="field">
-                                            <label class="ed-label !text-[11px]">{{ humanize(field) }}</label>
-                                            <ImagePicker v-if="isImageProp(field)" :model-value="val" :project-id="projectId" @update:model-value="updateNested(key, i, field, $event)" />
-                                            <input v-else type="text" :value="val" :placeholder="humanize(field)" class="ed-input ed-input-sm" @input="updateNested(key, i, field, $event.target.value)" />
+                                        <div v-for="field in visibleItemFields(key, value)" :key="field">
+                                            <!-- On/off -->
+                                            <label v-if="typeof item[field] === 'boolean' || field === 'highlighted'" class="flex cursor-pointer items-center justify-between gap-3">
+                                                <span class="ed-label !mb-0 !text-[11px]">{{ field === 'highlighted' ? 'Recommended plan' : humanize(field) }}</span>
+                                                <button type="button" role="switch" :aria-checked="!!item[field]" :class="['toggle', item[field] && 'toggle--on']" @click="updateNested(key, i, field, !item[field])"><span></span></button>
+                                            </label>
+                                            <template v-else>
+                                                <label class="ed-label !text-[11px]">{{ field === 'icon' ? 'Icon (emoji)' : humanize(field) }}</label>
+                                                <ImagePicker v-if="isImageProp(field)" :model-value="item[field] || ''" :project-id="projectId" @update:model-value="updateNested(key, i, field, $event)" />
+                                                <textarea v-else-if="Array.isArray(item[field])" :value="item[field].join('\n')" rows="4" placeholder="One per line" class="ed-textarea ed-input-sm" @change="updateNested(key, i, field, $event.target.value.split('\n').map((l) => l.trim()).filter(Boolean))"></textarea>
+                                                <textarea v-else-if="isLongText(field) || field === 'quote'" :value="item[field] || ''" rows="3" class="ed-textarea ed-input-sm" @input="updateNested(key, i, field, $event.target.value)"></textarea>
+                                                <input v-else type="text" :value="item[field] ?? ''" :placeholder="field === 'icon' ? 'e.g. 👕' : humanize(field)" :class="['ed-input ed-input-sm', field === 'icon' && '!w-20 text-center !text-base']" @input="updateNested(key, i, field, $event.target.value)" />
+                                            </template>
                                         </div>
                                     </div>
                                 </details>
+                                <p v-if="!value.length" class="rounded-lg border border-dashed border-lp-ink/15 px-3 py-4 text-center text-xs text-lp-subtle">No {{ humanize(key).toLowerCase() }} yet.</p>
                             </div>
-                            <button type="button" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-lp-accent hover:opacity-80" @click="addArrayItem(key, Object.fromEntries(Object.keys(value[0] || {}).map(k => [k, ''])))">
+                            <button type="button" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-lp-accent hover:opacity-80" @click="addItem(key, value)">
                                 <Icon name="plus" :stroke="2.2" class="size-3.5" />Add {{ singular(key) }}
                             </button>
                         </div>
 
-                        <!-- Lists of strings -->
-                        <div v-else-if="Array.isArray(value) && (!value.length || typeof value[0] === 'string')">
+                        <!-- Lists of strings (e.g. contact form fields) -->
+                        <div v-else-if="Array.isArray(value)">
                             <label class="ed-label">{{ humanize(key) }}</label>
-                            <div class="flex flex-wrap gap-1.5">
-                                <span v-for="v in value" :key="v" class="chip">{{ v }}</span>
-                                <span v-if="!value.length" class="text-xs text-lp-subtle">None</span>
-                            </div>
+                            <textarea :value="value.join('\n')" rows="4" placeholder="One per line" class="ed-textarea ed-input-sm" @change="update(key, $event.target.value.split('\n').map((l) => l.trim()).filter(Boolean))"></textarea>
+                            <p class="mt-1 text-[11px] text-lp-subtle">One per line.</p>
                         </div>
                     </template>
                 </section>
