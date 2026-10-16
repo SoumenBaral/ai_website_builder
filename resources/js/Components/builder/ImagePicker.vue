@@ -17,6 +17,46 @@ const urlMode = ref(false);
 const urlInput = ref('');
 const fileInput = ref(null);
 
+/* ---------- Free photos ---------- */
+const tab = ref('yours'); // yours · free
+const stock = ref([]);
+const categories = ref([]);
+const stockLoading = ref(false);
+const stockQuery = ref('');
+const stockCategory = ref('');
+const stockLive = ref(false);
+let stockTimer = 0;
+let stockSeq = 0;
+
+async function loadStock() {
+    const seq = ++stockSeq;
+    stockLoading.value = true;
+    try {
+        const { data } = await axios.get(route('stock.index'), { params: { q: stockQuery.value || undefined, category: stockCategory.value || undefined } });
+        if (seq !== stockSeq) return; // a newer search finished first
+        stock.value = data.photos;
+        categories.value = data.categories;
+        stockLive.value = data.live;
+    } catch (e) {
+        if (seq === stockSeq) stock.value = [];
+    } finally {
+        if (seq === stockSeq) stockLoading.value = false;
+    }
+}
+function searchStock() {
+    clearTimeout(stockTimer);
+    stockTimer = setTimeout(loadStock, 300);
+}
+function pickCategory(key) {
+    stockCategory.value = stockCategory.value === key ? '' : key;
+    stockQuery.value = '';
+    loadStock();
+}
+function showFree() {
+    tab.value = 'free';
+    if (!stock.value.length) loadStock();
+}
+
 async function fetchAssets() {
     try {
         const { data } = await axios.get(`/projects/${props.projectId}/assets`);
@@ -89,9 +129,11 @@ async function applyUrl() {
     }
 }
 
-function openGallery() {
+async function openGallery() {
     showGallery.value = true;
-    fetchAssets();
+    await fetchAssets();
+    // No uploads yet? Start on the free photo library.
+    if (!assets.value.length) showFree();
 }
 
 onMounted(fetchAssets);
@@ -126,17 +168,20 @@ onMounted(fetchAssets);
         <Teleport defer to="#editor-root">
             <Transition enter-active-class="transition duration-200" enter-from-class="opacity-0" leave-active-class="transition duration-150" leave-to-class="opacity-0">
                 <div v-if="showGallery" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" @click.self="showGallery = false">
-                    <div class="picker-panel mx-4 flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl">
+                    <div class="picker-panel mx-4 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl">
                         <!-- Header -->
-                        <div class="flex items-center justify-between border-b border-lp-ink/[0.07] px-5 py-4">
-                            <h3 class="text-sm font-semibold text-lp-fg">Project Images</h3>
+                        <div class="flex items-center justify-between gap-3 border-b border-lp-ink/[0.07] px-5 py-3.5">
+                            <div class="picker-tabs" role="tablist">
+                                <button type="button" role="tab" :aria-selected="tab === 'yours'" :class="['picker-tab', tab === 'yours' && 'picker-tab--on']" @click="tab = 'yours'">Your images<span v-if="assets.length" class="picker-count">{{ assets.length }}</span></button>
+                                <button type="button" role="tab" :aria-selected="tab === 'free'" :class="['picker-tab', tab === 'free' && 'picker-tab--on']" @click="showFree">Free photos</button>
+                            </div>
                             <button @click="showGallery = false" class="ed-icon-btn">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
 
                         <!-- Upload area -->
-                        <div class="border-b border-lp-ink/[0.07] px-5 py-3">
+                        <div v-show="tab === 'yours'" class="border-b border-lp-ink/[0.07] px-5 py-3">
                             <div class="flex gap-2">
                                 <label class="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-lp-ink/15 px-4 py-3 transition hover:border-violet-400/60 hover:bg-violet-500/5">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-lp-subtle"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
@@ -162,12 +207,51 @@ onMounted(fetchAssets);
                             </div>
                         </div>
 
+                        <!-- Free photos -->
+                        <template v-if="tab === 'free'">
+                            <div class="border-b border-lp-ink/[0.07] px-5 py-3">
+                                <label class="picker-search">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="size-4 shrink-0 text-lp-subtle"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                                    <input v-model="stockQuery" type="search" placeholder="Search photos — e.g. coffee, cricket, sneakers, wedding" @input="searchStock" @keydown.enter.prevent="loadStock" />
+                                </label>
+                                <div class="picker-cats mt-2.5">
+                                    <button v-for="c in categories" :key="c.key" type="button" :class="['picker-cat', stockCategory === c.key && 'picker-cat--on']" @click="pickCategory(c.key)">{{ c.label }}</button>
+                                </div>
+                            </div>
+                            <div class="flex-1 overflow-y-auto p-5">
+                                <div v-if="stockLoading && !stock.length" class="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                                    <div v-for="n in 12" :key="n" class="aspect-[4/3] animate-pulse rounded-xl bg-lp-ink/[0.07]"></div>
+                                </div>
+                                <div v-else-if="!stock.length" class="py-10 text-center text-lp-subtle">
+                                    <p class="text-sm font-medium">No photos for “{{ stockQuery }}”</p>
+                                    <p class="mt-1 text-xs">Try a simpler word, or pick a category above.</p>
+                                </div>
+                                <div v-else :class="['grid grid-cols-3 gap-2 sm:grid-cols-4 transition-opacity', stockLoading && 'opacity-60']">
+                                    <button
+                                        v-for="photo in stock"
+                                        :key="photo.id"
+                                        type="button"
+                                        :title="photo.label"
+                                        class="group relative aspect-[4/3] overflow-hidden rounded-xl border-2 transition-all hover:shadow-lg"
+                                        :class="modelValue === photo.url ? 'border-violet-500 ring-2 ring-violet-500/30' : 'border-transparent hover:border-violet-400/60'"
+                                        @click="selectAsset(photo.url)"
+                                    >
+                                        <img :src="photo.thumb" :alt="photo.label" loading="lazy" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                        <span class="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 pb-1 pt-4 text-left text-[10px] font-medium capitalize text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                            {{ photo.label }}<template v-if="photo.credit"> · {{ photo.credit }}</template>
+                                        </span>
+                                    </button>
+                                </div>
+                                <p class="mt-4 text-center text-[11px] text-lp-subtle">Free to use photos from Unsplash{{ stockLive ? '' : ' · hand-picked library' }}.</p>
+                            </div>
+                        </template>
+
                         <!-- Gallery grid -->
-                        <div class="flex-1 overflow-y-auto p-5">
+                        <div v-if="tab === 'yours'" class="flex-1 overflow-y-auto p-5">
                             <div v-if="assets.length === 0 && !uploading" class="py-10 text-center text-lp-subtle">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="mx-auto mb-3 size-10 text-lp-subtle/60"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" /></svg>
                                 <p class="text-sm font-medium">No images yet</p>
-                                <p class="text-xs mt-1">Upload your first image above</p>
+                                <p class="text-xs mt-1">Upload your first image above, or <button type="button" class="font-semibold text-violet-500 hover:underline" @click="showFree">browse free photos</button>.</p>
                             </div>
                             <div v-else class="grid grid-cols-3 gap-2">
                                 <button
@@ -197,6 +281,20 @@ onMounted(fetchAssets);
 </template>
 
 <style scoped>
+.picker-tabs { display: inline-flex; gap: 2px; border-radius: 0.7rem; background: rgb(var(--lp-ink) / 0.05); padding: 3px; }
+.picker-tab { display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 0.5rem; padding: 0.35rem 0.8rem; font-size: 13px; font-weight: 500; color: rgb(var(--lp-muted)); transition: background-color 0.15s, color 0.15s; }
+.picker-tab:hover { color: rgb(var(--lp-text)); }
+.picker-tab--on { background: rgb(var(--lp-surface)); color: rgb(var(--lp-fg)); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / 0.12); }
+.picker-count { border-radius: 9999px; background: rgb(var(--lp-ink) / 0.08); padding: 0 0.4rem; font-size: 11px; }
+.picker-search { display: flex; align-items: center; gap: 0.5rem; height: 2.4rem; border-radius: 0.7rem; border: 1px solid rgb(var(--lp-ink) / 0.1); background: rgb(var(--lp-ink) / 0.03); padding: 0 0.75rem; }
+.picker-search:focus-within { border-color: rgb(139 92 246 / 0.6); box-shadow: 0 0 0 3px rgb(139 92 246 / 0.15); }
+.picker-search input { min-width: 0; flex: 1; border: 0; background: transparent; padding: 0; font-size: 13px; color: rgb(var(--lp-text)); box-shadow: none; }
+.picker-search input:focus { outline: none; box-shadow: none; }
+.picker-cats { display: flex; gap: 0.35rem; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.picker-cats::-webkit-scrollbar { display: none; }
+.picker-cat { flex-shrink: 0; border-radius: 9999px; border: 1px solid rgb(var(--lp-ink) / 0.1); padding: 0.25rem 0.7rem; font-size: 12px; font-weight: 500; color: rgb(var(--lp-muted)); transition: all 0.15s; }
+.picker-cat:hover { color: rgb(var(--lp-fg)); border-color: rgb(139 92 246 / 0.4); }
+.picker-cat--on { border-color: rgb(139 92 246 / 0.6); background: rgb(139 92 246 / 0.12); color: rgb(var(--lp-accent)); font-weight: 600; }
 .picker-panel {
     border: 1px solid rgb(var(--lp-ink) / 0.1);
     background: rgb(var(--lp-surface));

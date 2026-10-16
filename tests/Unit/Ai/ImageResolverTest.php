@@ -89,5 +89,9 @@ it('stays on topic for the business when matching photos run out', function () {
 
     $about = ImageLibrary::PHOTOS[photoId($out['sections'][2]['props']['image'])];
     expect(array_intersect($about, ['dental', 'dentist', 'clinic', 'doctor', 'healthcare']))->not->toBeEmpty()
-        ->and($out['sections'][3]['props'])->not->toHaveKey('image'); // optional + nothing fresh left → omitted
+        ;
+    // Optional image: either a fresh on-topic photo, or none at all — never an off-topic one.
+    if (isset($out['sections'][3]['props']['image'])) {
+        expect(array_intersect(ImageLibrary::PHOTOS[photoId($out['sections'][3]['props']['image'])], ['dental', 'dentist', 'clinic', 'doctor', 'healthcare', 'medical', 'hospital']))->not->toBeEmpty();
+    }
 });

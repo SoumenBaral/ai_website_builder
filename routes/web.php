@@ -73,6 +73,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/projects/{project}/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
 
     // Analytics
+    Route::get('/stock-photos', [\App\Http\Controllers\StockPhotoController::class, 'index'])->middleware('throttle:60,1')->name('stock.index');
     Route::get('/orders', [\App\Http\Controllers\OrderController::class, 'all'])->name('orders.all');
     Route::get('/projects/{project}/orders', [\App\Http\Controllers\OrderController::class, 'index'])->name('orders.index');
     Route::patch('/projects/{project}/orders/{order}', [\App\Http\Controllers\OrderController::class, 'update'])->name('orders.update');
