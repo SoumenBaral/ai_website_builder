@@ -4,360 +4,377 @@ namespace App\Services;
 
 use App\Models\AiGeneration;
 use App\Models\User;
+use App\Services\Ai\AiException;
+use App\Services\Ai\BlockCatalog;
+use App\Services\Ai\Prompts;
+use App\Services\Ai\SchemaNormalizer;
+use Illuminate\Support\Facades\Log;
+use OpenAI\Exceptions\ErrorException;
+use OpenAI\Exceptions\RateLimitException;
+use OpenAI\Exceptions\ServerException;
+use OpenAI\Exceptions\TransporterException;
+use OpenAI\Exceptions\UnserializableResponse;
 use OpenAI\Laravel\Facades\OpenAI;
 
+/**
+ * Generates and edits websites with OpenAI structured outputs.
+ *
+ * Pipeline for every request:
+ *   strict JSON schema (BlockCatalog) → OpenAI (streamed when a progress
+ *   callback is given) → truncation / JSON checks with one retry →
+ *   SchemaValidator (structure) → SchemaNormalizer (repair & polish) →
+ *   ImageResolver (real photos).
+ */
 class AiWebsiteService
 {
     public function __construct(
         private SchemaValidator $validator,
         private ImageResolver $imageResolver,
+        private SchemaNormalizer $normalizer,
     ) {}
 
-    public function generate(string $userPrompt, ?int $userId = null, ?int $projectId = null): array
+    /**
+     * Generate a complete website from a prompt.
+     *
+     * @param callable|null $onProgress fn(array $event) — receives {stage, message, progress}
+     */
+    public function generate(string $userPrompt, ?int $userId = null, ?int $projectId = null, ?callable $onProgress = null): array
     {
-        // Enforce generation caps
         if ($userId) {
             $this->enforceGenerationCap($userId);
         }
 
-        $response = OpenAI::chat()->create([
-            'model' => 'gpt-4.1',
-            'messages' => [
-                ['role' => 'system', 'content' => $this->systemPrompt()],
-                ['role' => 'user', 'content' => $userPrompt],
+        $model = config('ai.models.generate');
+        $result = $this->requestJson(
+            model: $model,
+            messages: [
+                ['role' => 'system', 'content' => Prompts::generate()],
+                ['role' => 'user', 'content' => trim($userPrompt)],
             ],
-            'response_format' => [
-                'type' => 'json_schema',
-                'json_schema' => [
-                    'name' => 'website_schema',
-                    'strict' => false,
-                    'schema' => $this->jsonSchema(),
-                ],
-            ],
-            'max_completion_tokens' => 4000,
-        ]);
+            schemaName: 'website',
+            schema: BlockCatalog::siteSchema('plan'),
+            maxTokens: config('ai.max_tokens.generate'),
+            temperature: config('ai.temperature.generate'),
+            onProgress: $onProgress,
+            expectedTokens: 2400,
+        );
 
-        $json = $response->choices[0]->message->content;
-        $schema = json_decode($json, true);
+        $data = $result['data'];
+        $plan = is_array($data['plan'] ?? null) ? $data['plan'] : [];
+        unset($data['plan']);
 
-        $schema = $this->validator->validate($schema);
-        $schema = $this->imageResolver->resolvePlaceholders($schema);
+        $schema = $this->finalizeSite($data, ensureFrame: true, hint: implode(' ', array_filter([
+            $plan['industry'] ?? null, $plan['brand'] ?? null, $plan['visualDirection'] ?? null, $userPrompt,
+        ])));
 
         if ($userId) {
-            AiGeneration::create([
-                'user_id' => $userId,
-                'project_id' => $projectId,
-                'prompt' => $userPrompt,
-                'model' => 'gpt-4.1',
-                'input_tokens' => $response->usage->promptTokens ?? null,
-                'output_tokens' => $response->usage->completionTokens ?? null,
-                'cost_usd' => $this->estimateCost($response->usage->promptTokens ?? 0, $response->usage->completionTokens ?? 0),
-                'status' => 'completed',
-            ]);
+            $this->recordUsage($userId, $projectId, $userPrompt, $model, $result['usage']);
         }
+
+        Log::info('AI website generated', [
+            'project_id' => $projectId,
+            'sections' => count($schema['sections']),
+            'fixes' => $this->normalizer->fixes(),
+            'output_tokens' => $result['usage']['output'] ?? null,
+        ]);
 
         return $schema;
     }
 
-    public function editSchema(array $currentSchema, string $instruction, ?int $userId = null): array
+    /**
+     * Apply an instruction to the whole site.
+     *
+     * @return array{schema: array, summary: string}
+     */
+    public function editSchema(array $currentSchema, string $instruction, ?int $userId = null, ?callable $onProgress = null): array
     {
-        $response = OpenAI::chat()->create([
-            'model' => 'gpt-4.1-mini',
-            'messages' => [
-                ['role' => 'system', 'content' => $this->editSystemPrompt()],
-                ['role' => 'user', 'content' => "Instruction: {$instruction}\n\nCurrent schema:\n" . json_encode($currentSchema)],
+        $result = $this->requestJson(
+            model: config('ai.models.edit'),
+            messages: [
+                ['role' => 'system', 'content' => Prompts::editSite()],
+                ['role' => 'user', 'content' => "Instruction: {$instruction}\n\nCurrent website JSON:\n" . json_encode($this->forModel($currentSchema), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)],
             ],
-            'response_format' => [
-                'type' => 'json_schema',
-                'json_schema' => [
-                    'name' => 'website_schema',
-                    'strict' => false,
-                    'schema' => $this->jsonSchema(),
-                ],
-            ],
-            'max_completion_tokens' => 8000,
-        ]);
+            schemaName: 'website_edit',
+            schema: BlockCatalog::siteSchema('summary'),
+            maxTokens: config('ai.max_tokens.edit_site'),
+            temperature: config('ai.temperature.edit'),
+            onProgress: $onProgress,
+            expectedTokens: max(500, (int) (strlen(json_encode($currentSchema)) / 3.5)),
+        );
 
-        $json = $response->choices[0]->message->content;
-        $schema = json_decode($json, true);
+        $data = $result['data'];
+        $summary = $this->summary($data['summary'] ?? null);
+        unset($data['summary']);
 
-        $schema = $this->validator->validate($schema);
-        $schema = $this->imageResolver->resolvePlaceholders($schema);
-
-        return $schema;
-    }
-
-    public function editSection(array $section, string $instruction, array $theme, ?int $userId = null): array
-    {
-        $response = OpenAI::chat()->create([
-            'model' => 'gpt-4.1-mini',
-            'messages' => [
-                ['role' => 'system', 'content' => $this->sectionEditPrompt()],
-                ['role' => 'user', 'content' => "Instruction: {$instruction}\n\nTheme: " . json_encode($theme) . "\n\nSection:\n" . json_encode($section)],
-            ],
-            'response_format' => [
-                'type' => 'json_schema',
-                'json_schema' => [
-                    'name' => 'section_schema',
-                    'strict' => false,
-                    'schema' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'id' => ['type' => 'string'],
-                            'type' => ['type' => 'string'],
-                            'props' => ['type' => 'object'],
-                        ],
-                        'required' => ['id', 'type', 'props'],
-                    ],
-                ],
-            ],
-            'max_completion_tokens' => 3000,
-        ]);
-
-        $json = $response->choices[0]->message->content;
-        $result = json_decode($json, true);
-
-        if (!$result || !isset($result['props'])) {
-            throw new \Exception('AI returned invalid section data.');
-        }
-
-        // Preserve original id and type
-        $result['id'] = $section['id'];
-        $result['type'] = $section['type'];
-
-        // Resolve image placeholders in the section
-        $tempSchema = ['sections' => [$result]];
-        $tempSchema = $this->imageResolver->resolvePlaceholders($tempSchema);
-        $result = $tempSchema['sections'][0];
-
-        return $result;
-    }
-
-    private function blockPropsReference(): string
-    {
-        return <<<'REF'
-BLOCK TYPES & THEIR PROPS (including layout props):
-
-navbar: { brand, links [{label, href}], ctaText, ctaHref }
-hero: { heading, subheading, ctaText, ctaHref, image, align ("center"|"left"|"right"), layout ("center"|"left"|"right"|"split-left"|"split-right"), overlayOpacity (0-100, default 50), minHeight ("sm"|"md"|"lg"|"full") }
-  - layout "center"/"left"/"right": full background image with text alignment
-  - layout "split-left": image on LEFT, text on RIGHT (50/50 grid)
-  - layout "split-right": text on LEFT, image on RIGHT (50/50 grid)
-features: { heading, image (optional header image), items [{icon (emoji), title, description, image (optional item image URL)}], columns (1-4, default 3), align ("center"|"left") }
-gallery: { heading, columns (2-4), images [{src, caption}] }
-about: { heading, body, image, imagePosition ("left"|"right", default "right") }
-services: { heading, image (optional header image), items [{icon (emoji), title, description, image (optional item image URL)}], columns (1-4, default 3), align ("center"|"left") }
-testimonials: { heading, items [{quote, author, role, image}], columns (1-3, default 3) }
-pricing: { heading, image (optional header image), plans [{name, price, period, features (string[]), cta, highlighted (bool)}], columns (1-3, default 3) }
-stats: { heading, image (optional background image with dark overlay), items [{value, label}], columns (2-6, default 4) }
-faq: { heading, image (optional side image, creates 2-col layout), items [{question, answer}], maxWidth ("sm"|"md"|"lg"|"full", default "md") }
-team: { heading, members [{name, role, image, bio}], columns (1-4, default 4) }
-cta: { heading, subheading, ctaText, ctaHref, image (optional background image with overlay), align ("center"|"left") }
-contact: { heading, subheading, image (optional top image), email, phone, address, fields (string[]), layout ("split"|"stacked", default "split") }
-custom: { columns (1-4), gap (sm/md/lg/xl), padding (sm/md/lg/xl), elements (array of element objects) }
-  Element types: heading {text, size (xl/2xl/3xl/4xl), align}, text {text, size (sm/base/lg/xl), align}, image {src ("PLACEHOLDER:desc"), alt, radius, shadow, border, width (full/half/third)}, icon {emoji, size (2xl-5xl)}, button {text, href, variant (primary/secondary/outline)}, divider {style (solid/dashed/dotted)}, spacer {height (sm/md/lg/xl)}
-  Use custom blocks when users want a unique layout that doesn't fit predefined block types.
-footer: { brand, links [{label, href}], copyright, socials [{platform, url}] }
-
-NOTE: ALL blocks now support an optional `image` prop. Use it to add visual richness.
-
-STYLING PROPS (available on ALL section types):
-- sectionBg: custom background color (hex like "#1e293b" or any CSS color)
-- sectionText: custom text color (hex like "#ffffff")
-These override the global theme for that section only.
-
-IMAGE STYLING PROPS (available on blocks that display images):
-- imageRadius: "none" | "sm" | "md" | "lg" | "xl" | "full" — controls border-radius of the image
-- imageShadow: "none" | "sm" | "md" | "lg" | "xl" — adds shadow to the image
-- imageBorder: "none" | "thin" | "thick" — adds border around the image
-Example: imageRadius "full" + imageShadow "lg" = circular image with large shadow
-
-LAYOUT TIPS:
-- Use "split-left"/"split-right" for hero to create modern side-by-side layouts
-- Set imagePosition "left" on about sections for variety
-- Use columns to control grid density (fewer columns = bigger cards)
-- Set align "left" for a more editorial/blog feel, "center" for landing pages
-- Use minHeight "full" for full-screen hero sections
-- Use layout "stacked" on contact for a centered single-column form
-- Add image to CTA/stats sections for dramatic background effects
-- Add image to FAQ for a visual 2-column layout
-
-IMAGES:
-- Use "PLACEHOLDER:<short description>" for new images — server replaces with real Unsplash photos.
-- Set imageRadius, imageShadow, imageBorder to style images (round, shadow, border).
-REF;
-    }
-
-    private function systemPrompt(): string
-    {
-        $ref = $this->blockPropsReference();
-        return <<<PROMPT
-You are a senior web designer that outputs ONLY a website layout as JSON.
-
-Rules:
-- Return a JSON object matching the provided schema EXACTLY. No prose, no HTML, no markdown.
-- Choose 5–8 sections that fit the user's purpose and industry.
-- Always start with a "navbar" and end with a "footer".
-- Pick a tasteful theme: a primary color suited to the brand, readable fonts, and a light/dark mode that fits the mood.
-- Write realistic, specific marketing copy — never "Lorem ipsum".
-- Keep headings short and punchy; body copy concise but persuasive.
-- Each section must have a unique id in the format "blk_<type>_<number>".
-- Use sectionBg/sectionText props to create visual contrast between sections (e.g. alternate light/dark sections, colored hero).
-- Available section types: navbar, hero, features, gallery, about, services, testimonials, pricing, stats, faq, team, cta, contact, footer.
-
-{$ref}
-
-You will be given a user request describing the website they want.
-PROMPT;
-    }
-
-    private function editSystemPrompt(): string
-    {
-        $ref = $this->blockPropsReference();
-        return <<<PROMPT
-You edit an existing website JSON schema. Apply the user's requested change and return the FULL updated JSON matching the schema. Change only what is requested — preserve everything else EXACTLY as-is.
-
-You can do ANYTHING the user asks:
-- Change text content (headings, body, CTA text, etc.)
-- Change colors and styling (theme colors, sectionBg, sectionText for any section)
-- Add/remove/reorder sections
-- Add/remove items within sections (features, testimonials, team members, pricing plans, FAQ items, etc.)
-- Change images (use "PLACEHOLDER:<description>" for new ones)
-- Change fonts, border radius, dark/light mode in the theme
-- Change the navbar brand name, links, CTA
-- Restructure layout (e.g. change number of gallery columns)
-- Add new sections of any type
-- Improve copy quality, make it more professional, change tone
-- Translate content to another language
-- Anything else — you have full control over the JSON
-
-Rules:
-- Return the complete updated JSON schema.
-- Only modify what the user's instruction asks for.
-- Keep all section IDs unchanged unless adding/removing sections.
-- New sections need unique ids: "blk_<type>_<number>".
-
-{$ref}
-PROMPT;
-    }
-
-    private function sectionEditPrompt(): string
-    {
-        $ref = $this->blockPropsReference();
-        return <<<PROMPT
-You are an expert web designer. You edit a SINGLE section of a website JSON schema.
-
-You receive:
-1. The current section JSON (with id, type, props)
-2. The site's theme (colors, fonts, etc.)
-3. An instruction describing what to change
-
-Return ONLY the updated section JSON object with id, type, and props.
-
-You can do ANYTHING the user asks for this section:
-- Rewrite/improve any text (headings, descriptions, quotes, etc.)
-- Change section colors: set sectionBg (background) and sectionText (text color) props
-- Add/remove/edit items (features, testimonials, team members, FAQ, pricing plans, stats, etc.)
-- Change images (use "PLACEHOLDER:<description>" for new ones)
-- Change layout props (columns, alignment, etc.)
-- Add new props like email, phone, address for contact sections
-- Change nav links, brand name, CTA text and URL
-- Change pricing (amounts, features, plan names, highlighting)
-- Translate content to another language
-- Change the tone (formal, casual, playful, corporate, etc.)
-- Make content longer or shorter
-- Add social media links, opening hours, location details
-- Anything else — you have full control over the section's props
-
-Rules:
-- Keep the id and type unchanged.
-- Preserve all existing props that are not being changed.
-- Write professional, realistic copy — never "Lorem ipsum".
-- When improving, enhance copy quality AND adjust styling (colors, layout) if appropriate.
-
-{$ref}
-PROMPT;
-    }
-
-    private function jsonSchema(): array
-    {
         return [
-            'type' => 'object',
-            'additionalProperties' => false,
-            'required' => ['version', 'meta', 'theme', 'sections'],
-            'properties' => [
-                'version' => ['type' => 'integer'],
-                'meta' => [
-                    'type' => 'object',
-                    'additionalProperties' => false,
-                    'required' => ['title', 'description', 'language'],
-                    'properties' => [
-                        'title' => ['type' => 'string'],
-                        'description' => ['type' => 'string'],
-                        'language' => ['type' => 'string'],
-                    ],
-                ],
-                'theme' => [
-                    'type' => 'object',
-                    'additionalProperties' => false,
-                    'required' => ['primaryColor', 'secondaryColor', 'backgroundColor', 'textColor', 'fontHeading', 'fontBody', 'radius', 'mode'],
-                    'properties' => [
-                        'primaryColor' => ['type' => 'string'],
-                        'secondaryColor' => ['type' => 'string'],
-                        'backgroundColor' => ['type' => 'string'],
-                        'textColor' => ['type' => 'string'],
-                        'fontHeading' => ['type' => 'string'],
-                        'fontBody' => ['type' => 'string'],
-                        'radius' => ['type' => 'string', 'enum' => ['none', 'sm', 'md', 'lg', 'xl', 'full']],
-                        'mode' => ['type' => 'string', 'enum' => ['light', 'dark']],
-                    ],
-                ],
-                'sections' => [
-                    'type' => 'array',
-                    'items' => [
-                        'type' => 'object',
-                        'additionalProperties' => false,
-                        'required' => ['id', 'type', 'props'],
-                        'properties' => [
-                            'id' => ['type' => 'string'],
-                            'type' => [
-                                'type' => 'string',
-                                'enum' => ['navbar', 'hero', 'features', 'gallery', 'about', 'services', 'testimonials', 'pricing', 'stats', 'faq', 'team', 'cta', 'contact', 'custom', 'footer'],
-                            ],
-                            'props' => ['type' => 'object'],
-                        ],
-                    ],
-                ],
-            ],
+            'schema' => $this->finalizeSite($data, ensureFrame: false, hint: $currentSchema['meta']['title'] ?? ''),
+            'summary' => $summary,
         ];
     }
 
-    private function enforceGenerationCap(int $userId): void
+    /**
+     * Apply an instruction to one section. The section keeps its id and type.
+     *
+     * @return array{section: array, summary: string}
+     */
+    public function editSection(array $section, string $instruction, array $theme, ?int $userId = null): array
     {
-        $user = User::findOrFail($userId);
-        $limit = match ($user->plan) {
+        $type = (string) ($section['type'] ?? '');
+        if (!BlockCatalog::has($type)) {
+            throw new AiException('This section type cannot be edited with AI yet.', 422);
+        }
+
+        $result = $this->requestJson(
+            model: config('ai.models.edit'),
+            messages: [
+                ['role' => 'system', 'content' => Prompts::editSection($type)],
+                ['role' => 'user', 'content' => "Instruction: {$instruction}\n\nTheme: " . json_encode($theme, JSON_UNESCAPED_SLASHES)
+                    . "\n\nCurrent props:\n" . json_encode($section['props'] ?? new \stdClass(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)],
+            ],
+            schemaName: 'section_edit',
+            schema: BlockCatalog::sectionEditSchema($type),
+            maxTokens: config('ai.max_tokens.edit_section'),
+            temperature: config('ai.temperature.edit'),
+        );
+
+        $updated = $this->normalizer->normalizeSection(
+            ['id' => $section['id'] ?? null, 'type' => $type, 'props' => $result['data']['props'] ?? []],
+            $theme,
+        );
+        $updated['id'] = $section['id'] ?? $updated['id'];
+
+        // Resolve new photos without repeating ones already in this section.
+        $updated = $this->imageResolver->resolvePlaceholders(['sections' => [$updated]], $type)['sections'][0];
+
+        return ['section' => $updated, 'summary' => $this->summary($result['data']['summary'] ?? null)];
+    }
+
+    /* ==================================================================
+     | Internals
+     * ================================================================== */
+
+    private function finalizeSite(array $data, bool $ensureFrame, string $hint): array
+    {
+        $data['version'] = 1;
+        $schema = $this->normalizer->normalizeSite($data, $ensureFrame);
+        $this->validator->validate($schema);
+
+        if (!$schema['sections']) {
+            throw AiException::unusable();
+        }
+
+        return $this->imageResolver->resolvePlaceholders($schema, $hint);
+    }
+
+    /** Strip noise the model doesn't need (keeps token use and latency down). */
+    private function forModel(array $schema): array
+    {
+        unset($schema['version']);
+
+        return $schema;
+    }
+
+    private function summary(mixed $value): string
+    {
+        $text = is_string($value) ? trim($value) : '';
+
+        return $text !== '' ? mb_substr($text, 0, 200) : 'Done — your changes are applied.';
+    }
+
+    /**
+     * Call OpenAI with a strict JSON schema. Retries once on truncated/invalid
+     * output. When $onProgress is given the response is streamed and progress
+     * events are emitted as the JSON arrives.
+     *
+     * @return array{data: array, usage: array{input: ?int, output: ?int}}
+     */
+    private function requestJson(
+        string $model,
+        array $messages,
+        string $schemaName,
+        array $schema,
+        int $maxTokens,
+        float $temperature,
+        ?callable $onProgress = null,
+        int $expectedTokens = 3000,
+    ): array {
+        $params = [
+            'model' => $model,
+            'messages' => $messages,
+            'temperature' => $temperature,
+            'max_completion_tokens' => $maxTokens,
+            'response_format' => [
+                'type' => 'json_schema',
+                'json_schema' => ['name' => $schemaName, 'strict' => true, 'schema' => $schema],
+            ],
+        ];
+
+        $attempts = 1 + max(0, (int) config('ai.retries'));
+        $lastError = null;
+
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            try {
+                [$content, $finish, $usage] = $onProgress
+                    ? $this->stream($params, $onProgress, $expectedTokens)
+                    : $this->complete($params);
+
+                if ($finish === 'length') {
+                    throw new \RuntimeException('Output truncated at max_completion_tokens');
+                }
+
+                $data = json_decode($content ?? '', true);
+                if (!is_array($data)) {
+                    throw new \RuntimeException('Model output was not valid JSON');
+                }
+
+                return ['data' => $data, 'usage' => $usage];
+            } catch (RateLimitException $e) {
+                Log::warning('OpenAI rate limited', ['model' => $model]);
+
+                throw AiException::unavailable($e);
+            } catch (ErrorException $e) {
+                // API rejected the request (bad key, quota, invalid schema): retrying won't help.
+                Log::error('OpenAI request rejected', ['model' => $model, 'error' => $e->getMessage()]);
+
+                throw str_contains(strtolower($e->getMessage()), 'quota') || str_contains(strtolower($e->getMessage()), 'rate')
+                    ? AiException::unavailable($e)
+                    : new AiException('The AI request was rejected. Please try again, or contact support if it keeps happening.', 502, $e);
+            } catch (TransporterException|ServerException|UnserializableResponse $e) {
+                Log::warning('OpenAI transport error', ['model' => $model, 'attempt' => $attempt, 'error' => $e->getMessage()]);
+                $lastError = AiException::unavailable($e);
+            } catch (\RuntimeException $e) {
+                Log::warning('Unusable AI output', ['model' => $model, 'attempt' => $attempt, 'error' => $e->getMessage()]);
+                $lastError = AiException::unusable($e);
+            }
+
+            if ($attempt < $attempts && $onProgress) {
+                $onProgress(['stage' => 'retry', 'message' => 'Polishing the result…', 'progress' => 0.1]);
+            }
+        }
+
+        throw $lastError ?? AiException::unusable();
+    }
+
+    /** @return array{0: ?string, 1: ?string, 2: array} */
+    private function complete(array $params): array
+    {
+        $response = OpenAI::chat()->create($params);
+        $choice = $response->choices[0] ?? null;
+
+        return [
+            $choice?->message->content,
+            $choice?->finishReason,
+            ['input' => $response->usage?->promptTokens, 'output' => $response->usage?->completionTokens],
+        ];
+    }
+
+    /** @return array{0: string, 1: ?string, 2: array} */
+    private function stream(array $params, callable $onProgress, int $expectedTokens): array
+    {
+        $params['stream_options'] = ['include_usage' => true];
+        $stream = OpenAI::chat()->createStreamed($params);
+
+        $buffer = '';
+        $finish = null;
+        $usage = ['input' => null, 'output' => null];
+        $chunks = 0;
+        $lastStage = null;
+        $sectionsSeen = 0;
+
+        $onProgress(['stage' => 'start', 'message' => 'Understanding your request…', 'progress' => 0.03]);
+
+        foreach ($stream as $response) {
+            if ($response->usage) {
+                $usage = ['input' => $response->usage->promptTokens, 'output' => $response->usage->completionTokens];
+            }
+            $choice = $response->choices[0] ?? null;
+            if (!$choice) {
+                continue;
+            }
+            $buffer .= $choice->delta->content ?? '';
+            $finish = $choice->finishReason ?? $finish;
+            $chunks++;
+
+            // Every few chunks, describe what the model is writing right now.
+            if ($chunks % 8 !== 0) {
+                continue;
+            }
+            $progress = min(0.95, 0.05 + (strlen($buffer) / 4) / $expectedTokens * 0.9);
+            $event = $this->describeProgress($buffer, $sectionsSeen);
+            if ($event['stage'] !== $lastStage || $chunks % 40 === 0) {
+                $lastStage = $event['stage'];
+                $onProgress($event + ['progress' => round($progress, 3)]);
+            }
+        }
+
+        return [$buffer, $finish, $usage];
+    }
+
+    /** Turn the partial JSON into a human status ("Writing the pricing section…"). */
+    private function describeProgress(string $buffer, int &$sectionsSeen): array
+    {
+        if (preg_match_all('/"type"\s*:\s*"([a-z]+)"/', $buffer, $m) && $m[1]) {
+            $sectionsSeen = count($m[1]);
+            $type = end($m[1]);
+            $label = match ($type) {
+                'navbar' => 'navigation',
+                'hero' => 'hero',
+                'cta' => 'call to action',
+                'faq' => 'FAQ',
+                default => $type,
+            };
+
+            return ['stage' => "section:{$sectionsSeen}", 'message' => "Writing the {$label} section…", 'section' => $type];
+        }
+        if (str_contains($buffer, '"theme"')) {
+            return ['stage' => 'theme', 'message' => 'Choosing colors and fonts…'];
+        }
+        if (str_contains($buffer, '"meta"')) {
+            return ['stage' => 'meta', 'message' => 'Writing your page title and description…'];
+        }
+        if (str_contains($buffer, '"summary"')) {
+            return ['stage' => 'summary', 'message' => 'Working out the changes…'];
+        }
+
+        return ['stage' => 'plan', 'message' => 'Planning the brand, audience and layout…'];
+    }
+
+    private function recordUsage(int $userId, ?int $projectId, string $prompt, string $model, array $usage): void
+    {
+        AiGeneration::create([
+            'user_id' => $userId,
+            'project_id' => $projectId,
+            'prompt' => $prompt,
+            'model' => $model,
+            'input_tokens' => $usage['input'],
+            'output_tokens' => $usage['output'],
+            'cost_usd' => $this->estimateCost($model, $usage['input'] ?? 0, $usage['output'] ?? 0),
+            'status' => 'completed',
+        ]);
+    }
+
+    private function generationLimit(User $user): int
+    {
+        return match ($user->plan) {
             'pro' => 100,
             'team' => 500,
             default => 10, // free
         };
+    }
 
-        $monthlyCount = AiGeneration::where('user_id', $userId)
-            ->where('created_at', '>=', now()->startOfMonth())
-            ->count();
+    private function enforceGenerationCap(int $userId): void
+    {
+        $usage = $this->getRemainingGenerations($userId);
 
-        if ($monthlyCount >= $limit) {
-            throw new \Exception("Monthly generation limit reached ({$limit}). Upgrade your plan for more.");
+        if ($usage['remaining'] <= 0) {
+            throw AiException::limitReached($usage['limit']);
         }
     }
 
     public function getRemainingGenerations(int $userId): array
     {
         $user = User::findOrFail($userId);
-        $limit = match ($user->plan) {
-            'pro' => 100,
-            'team' => 500,
-            default => 10,
-        };
+        $limit = $this->generationLimit($user);
 
         $used = AiGeneration::where('user_id', $userId)
             ->where('created_at', '>=', now()->startOfMonth())
@@ -371,9 +388,11 @@ PROMPT;
         ];
     }
 
-    private function estimateCost(int $inputTokens, int $outputTokens): float
+    private function estimateCost(string $model, int $inputTokens, int $outputTokens): float
     {
-        // GPT-4.1 pricing: ~$2/1M input, ~$8/1M output
-        return ($inputTokens * 2 / 1_000_000) + ($outputTokens * 8 / 1_000_000);
+        // Model names contain dots (gpt-4.1), so read the array directly instead of dot-notation config().
+        [$in, $out] = config('ai.pricing')[$model] ?? [2.00, 8.00];
+
+        return ($inputTokens * $in / 1_000_000) + ($outputTokens * $out / 1_000_000);
     }
 }

@@ -5,6 +5,8 @@ import { BLOCK_TYPES } from '@/schema/defaults.js';
 import Icon from '@/Components/Landing/Icon.vue';
 import { showcase } from '@/Components/Landing/content';
 import axios from 'axios';
+import { streamAi } from './aiStream';
+import { useToast } from './useToast';
 
 const props = defineProps({
     projectId: [Number, String],
@@ -14,6 +16,8 @@ const props = defineProps({
 
 const emit = defineEmits(['generated', 'error']);
 const editor = useEditor();
+const { notify } = useToast();
+const progress = ref(0);
 
 const prompt = ref(props.initialPrompt);
 const loading = ref(false);
@@ -82,18 +86,20 @@ async function submit() {
     if (!prompt.value.trim() || loading.value) return;
 
     loading.value = true;
+    progress.value = 0.02;
+    const onProgress = (ev) => {
+        if (ev.message) statusText.value = ev.message;
+        if (typeof ev.progress === 'number') progress.value = Math.max(progress.value, ev.progress);
+    };
 
     try {
         if (mode.value === 'generate') {
-            // Generate new site
-            startStatusCycle(generateStatusMessages);
-            const { data } = await axios.post(route('ai.generate'), {
-                prompt: prompt.value,
-                project_id: props.projectId,
-            });
+            // Generate a new site — streamed so long generations show live progress
+            statusText.value = generateStatusMessages[0];
+            const data = await streamAi(route('ai.generate'), { prompt: prompt.value, project_id: props.projectId }, onProgress);
             emit('generated', data.schema);
         } else if (mode.value === 'section' && selectedBlock.value) {
-            // Edit selected section only
+            // Edit the selected section only (short request, plain JSON)
             startStatusCycle(editStatusMessages);
             const { data } = await axios.post(route('ai.editSection'), {
                 section: selectedBlock.value,
@@ -101,21 +107,21 @@ async function submit() {
                 instruction: prompt.value,
             });
             editor.updateSection(selectedBlock.value.id, data.section);
+            notify(data.summary || 'Section updated.', 'success', { duration: 6000 });
         } else {
-            // Edit full site
-            startStatusCycle(editStatusMessages);
-            const { data } = await axios.post(route('ai.edit'), {
-                schema: editor.schema,
-                instruction: prompt.value,
-            });
+            // Edit the full site — streamed
+            statusText.value = editStatusMessages[0];
+            const data = await streamAi(route('ai.edit'), { schema: editor.schema, instruction: prompt.value }, onProgress);
             editor.setSchema(data.schema);
+            notify(data.summary || 'Site updated.', 'success', { duration: 6000 });
         }
         prompt.value = '';
     } catch (err) {
-        const message = err.response?.data?.error || 'AI request failed. Please try again.';
+        const message = err.response?.data?.error || err.message || 'AI request failed. Please try again.';
         emit('error', message);
     } finally {
         loading.value = false;
+        progress.value = 0;
         stopStatusCycle();
     }
 }
@@ -157,6 +163,7 @@ defineExpose({ focus: () => input.value?.focus() });
             <p class="mx-auto mt-3 max-w-md text-[15px] text-lp-muted">One sentence is enough. AI writes the copy, picks colors and images, and lays out every section.</p>
 
             <form :class="['composer mt-8 text-left', loading && 'composer--busy']" @submit.prevent="submit">
+                <div v-if="loading" class="ai-progress" :style="{ transform: `scaleX(${progress})` }" aria-hidden="true"></div>
                 <textarea
                     ref="input"
                     v-model="prompt"
@@ -191,6 +198,7 @@ defineExpose({ focus: () => input.value?.focus() });
     <!-- Site exists: floating command dock -->
     <div v-else class="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-4 sm:px-6 sm:pb-5">
         <form :class="['dock pointer-events-auto w-full max-w-2xl', loading && 'composer--busy']" @submit.prevent="submit">
+            <div v-if="loading && progress > 0.03" class="ai-progress" :style="{ transform: `scaleX(${progress})` }" aria-hidden="true"></div>
             <div class="flex items-center gap-2 px-3 pt-2.5">
                 <span v-if="mode === 'section'" class="scope scope--section">
                     <Icon name="cursorClick" :stroke="1.8" class="size-3.5" />{{ selectedLabel }}
@@ -269,6 +277,18 @@ defineExpose({ focus: () => input.value?.focus() });
     animation: spin-border 2.4s linear infinite;
 }
 @keyframes spin-border { to { --angle: 360deg; } }
+
+.ai-progress {
+    position: absolute;
+    left: 1rem;
+    right: 1rem;
+    top: -1px;
+    height: 2px;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+    transform-origin: left;
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
 
 .scope {
     display: inline-flex;

@@ -2,14 +2,18 @@
 
 namespace App\Services;
 
+use App\Services\Ai\BlockCatalog;
 use ZipArchive;
 
 class ExportService
 {
     public function toHtml(array $schema, ?string $beacon = null): string
     {
-        $body = collect($schema['sections'])
-            ->map(function ($block) use ($schema) {
+        // Section ids make in-page links ("#about", "#contact") work on published sites.
+        $anchors = BlockCatalog::anchors($schema['sections']);
+
+        $body = collect(array_values($schema['sections']))
+            ->map(function ($block, $index) use ($schema, $anchors) {
                 $viewName = "export.blocks.{$block['type']}";
                 if (!view()->exists($viewName)) {
                     return "<!-- Unknown block type: {$block['type']} -->";
@@ -35,6 +39,10 @@ class ExportService
                         $vars .= '--text: ' . $txt . '; color: ' . $txt;
                     }
                     $html = '<div style="' . $vars . ';">' . $html . '</div>';
+                }
+
+                if (!empty($anchors[$index])) {
+                    $html = '<div id="' . e($anchors[$index]) . '" style="scroll-margin-top: 72px;">' . $html . '</div>';
                 }
 
                 return $html;

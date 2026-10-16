@@ -9,7 +9,7 @@ class SchemaValidator
     private const ALLOWED_TYPES = [
         'navbar', 'hero', 'features', 'gallery', 'about',
         'services', 'testimonials', 'pricing', 'stats',
-        'faq', 'team', 'cta', 'contact', 'footer',
+        'faq', 'team', 'cta', 'contact', 'custom', 'footer',
     ];
 
     public function validate(array $schema): array

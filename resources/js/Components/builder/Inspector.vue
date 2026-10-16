@@ -8,6 +8,7 @@ import Icon from '@/Components/Landing/Icon.vue';
 import { blockIcons, humanize, singular } from './blockMeta';
 import { useToast } from './useToast';
 import axios from 'axios';
+import { streamAi } from './aiStream';
 
 const projectId = inject('projectId');
 
@@ -104,6 +105,7 @@ async function askAi(instruction) {
     const text = instruction || aiInstruction.value.trim();
     if (!text || aiLoading.value) return;
     aiLoading.value = true;
+    let summary = '';
     try {
         if (aiMode.value === 'section' && block.value) {
             // Edit only the selected section
@@ -113,18 +115,17 @@ async function askAi(instruction) {
                 instruction: text,
             });
             editor.updateSection(block.value.id, data.section);
+            summary = data.summary;
         } else {
-            // Edit the full schema
-            const { data } = await axios.post(route('ai.edit'), {
-                schema: editor.schema,
-                instruction: text,
-            });
+            // Edit the full site (streamed so long edits don't time out)
+            const data = await streamAi(route('ai.edit'), { schema: editor.schema, instruction: text });
             editor.setSchema(data.schema);
+            summary = data.summary;
         }
         aiInstruction.value = '';
-        notify(aiMode.value === 'section' ? 'Section updated with AI' : 'Site updated with AI', 'success');
+        notify(summary || (aiMode.value === 'section' ? 'Section updated with AI' : 'Site updated with AI'), 'success', { duration: 6000 });
     } catch (e) {
-        notify(e.response?.data?.error || 'AI edit failed. Please try again.', 'error');
+        notify(e.response?.data?.error || e.message || 'AI edit failed. Please try again.', 'error');
     } finally {
         aiLoading.value = false;
     }
