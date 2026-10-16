@@ -54,6 +54,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Export
     Route::get('/projects/{project}/export', [ExportController::class, 'download'])->name('export.download');
     Route::get('/projects/{project}/preview-html', [ExportController::class, 'preview'])->name('export.preview');
+    Route::get('/projects/{project}/preview-html/{section}/{item}', [ExportController::class, 'previewItem'])
+        ->where(['section' => '[a-z0-9-]+', 'item' => '[a-z0-9-]+'])->name('export.previewItem');
+    Route::get('/projects/{project}/preview-card/{sectionId}/{index}', [ExportController::class, 'previewCard'])
+        ->whereNumber('index')->name('export.previewCard');
 
     // Publish
     Route::post('/projects/{project}/publish', [PublishController::class, 'publish'])->name('projects.publish');
@@ -69,6 +73,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/projects/{project}/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
 
     // Analytics
+    Route::get('/orders', [\App\Http\Controllers\OrderController::class, 'all'])->name('orders.all');
+    Route::get('/projects/{project}/orders', [\App\Http\Controllers\OrderController::class, 'index'])->name('orders.index');
+    Route::patch('/projects/{project}/orders/{order}', [\App\Http\Controllers\OrderController::class, 'update'])->name('orders.update');
     Route::get('/projects/{project}/analytics', [AnalyticsController::class, 'dashboard'])->name('analytics.dashboard');
 
     // Profile
@@ -79,6 +86,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 // Public site
 Route::get('/s/{slug}', [PublicSiteController::class, 'show'])->name('site.show');
+Route::post('/s/{slug}/orders', [\App\Http\Controllers\OrderController::class, 'store'])->middleware('throttle:8,1')->name('site.order');
+Route::get('/s/{slug}/{section}/{item}', [PublicSiteController::class, 'item'])
+    ->where(['section' => '[a-z0-9-]+', 'item' => '[a-z0-9-]+'])->name('site.item');
 
 // Analytics beacon (no auth)
 Route::post('/track', [AnalyticsController::class, 'store'])->name('analytics.track');

@@ -25,6 +25,7 @@ import { useColorMode, useDocumentTheme } from '@/Components/Landing/useColorMod
 const props = defineProps({
     project: Object,
     page: Object,
+    newOrders: { type: Number, default: 0 },
 });
 
 const editor = useEditor();
@@ -32,6 +33,7 @@ const { notify } = useToast();
 const { theme: uiTheme } = useColorMode();
 useDocumentTheme();
 provide('projectId', props.project.id);
+provide('newOrders', props.newOrders);
 
 /* ---------- Layout state ---------- */
 const devices = [
@@ -81,24 +83,24 @@ watch(navbarLogo, (url) => {
     }, 700);
 });
 
-watchDebounced(
-    () => editor.schema,
-    async () => {
-        if (!editor.dirty) return;
-        editor.saving = true;
-        try {
-            await axios.post(route('pages.autosave', { project: props.project.id, page: props.page.id }), {
-                schema: editor.schema,
-            });
-            editor.markClean();
-        } catch (e) {
-            notify('Autosave failed — check your connection.', 'error');
-        } finally {
-            editor.saving = false;
-        }
-    },
-    { debounce: 1200, deep: true },
-);
+async function saveNow() {
+    if (!editor.dirty) return;
+    editor.saving = true;
+    try {
+        await axios.post(route('pages.autosave', { project: props.project.id, page: props.page.id }), {
+            schema: editor.schema,
+        });
+        editor.markClean();
+    } catch (e) {
+        notify('Autosave failed — check your connection.', 'error');
+    } finally {
+        editor.saving = false;
+    }
+}
+// Previews (e.g. a card's details page) save first so they always show the latest edits.
+provide('saveNow', saveNow);
+
+watchDebounced(() => editor.schema, saveNow, { debounce: 1200, deep: true });
 
 const saveState = computed(() => (editor.saving ? 'saving' : editor.dirty ? 'unsaved' : 'saved'));
 
@@ -257,6 +259,10 @@ const fontLink = computed(() => {
                         </div>
                         <button type="button" class="menu-item sm:hidden" role="menuitem" @click="showVersionHistory = true; close()"><Icon name="clock" :stroke="1.7" class="size-4" />Version history</button>
                         <a :href="route('analytics.dashboard', project.id)" class="menu-item" role="menuitem"><Icon name="chart" :stroke="1.7" class="size-4" />Analytics</a>
+                        <a :href="route('orders.index', project.id)" class="menu-item" role="menuitem">
+                            <Icon name="tag" :stroke="1.7" class="size-4" />Orders
+                            <span v-if="newOrders" class="ml-auto rounded-full bg-violet-500 px-1.5 text-[10px] font-bold leading-4 text-white">{{ newOrders }}</span>
+                        </a>
                         <button type="button" class="menu-item" role="menuitem" @click="exportZip(); close()"><Icon name="download" :stroke="1.7" class="size-4" />Download ZIP</button>
                         <template v-if="isLive">
                             <div class="menu-sep"></div>

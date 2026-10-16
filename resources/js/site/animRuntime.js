@@ -388,7 +388,9 @@
             place(section, layer);
         };
         measure();
+        // Published pages style themselves a moment after load (Tailwind CDN): check again.
         if (w.document.readyState !== 'complete') w.addEventListener('load', measure, { once: true });
+        setTimeout(measure, 700);
         if ('ResizeObserver' in w) {
             host._fxResize = new ResizeObserver(measure);
             host._fxResize.observe(layer);
@@ -403,6 +405,7 @@
     }
 
     function opaque(el) {
+        if (/^(IMG|VIDEO|PICTURE|CANVAS|IFRAME)$/.test(el.tagName)) return true;
         var c = w.getComputedStyle(el);
         if (c.backgroundImage && c.backgroundImage !== 'none') return true;
         var m = /rgba?\(([^)]+)\)/.exec(c.backgroundColor || '');
@@ -412,20 +415,43 @@
     }
 
     /**
-     * Behind the content when the section itself is the background; on top of it (clicks pass
-     * through) when the section's columns paint their own backgrounds and would hide the layer.
+     * Behind the content when the section itself shows the background; on top of it (clicks
+     * pass through) when inner columns / photos paint over the section and would hide the layer.
+     * Coverage is sampled on a grid against every large painted element, at any depth — hero
+     * layouts often wrap their coloured columns in an extra div.
      */
     function place(section, layer) {
         var box = section.getBoundingClientRect();
-        var area = box.width * box.height || 1;
-        var covered = 0;
-        for (var i = 0; i < section.children.length; i++) {
-            var c = section.children[i];
-            if (c === layer) continue;
-            var r = c.getBoundingClientRect();
-            if (opaque(c)) covered += r.width * r.height;
+        if (!box.width || !box.height) return;
+        var painted = [];
+        var walk = function (el, depth) {
+            for (var i = 0; i < el.children.length; i++) {
+                var c = el.children[i];
+                if (c === layer || SKIP.test(c.tagName)) continue;
+                var r = c.getBoundingClientRect();
+                if (r.width * r.height < box.width * box.height * 0.08) continue; // small things don't hide a background
+                if (opaque(c)) painted.push(r);
+                else if (depth < 4) walk(c, depth + 1);
+            }
+        };
+        walk(section, 0);
+
+        var hits = 0;
+        var N = 8;
+        for (var y = 0; y < N; y++) {
+            for (var x = 0; x < N; x++) {
+                var px = box.left + ((x + 0.5) / N) * box.width;
+                var py = box.top + ((y + 0.5) / N) * box.height;
+                for (var k = 0; k < painted.length; k++) {
+                    var r = painted[k];
+                    if (px >= r.left && px <= r.right && py >= r.top && py <= r.bottom) {
+                        hits++;
+                        break;
+                    }
+                }
+            }
         }
-        layer.setAttribute('data-place', covered / area > 0.4 ? 'over' : 'under');
+        layer.setAttribute('data-place', hits / (N * N) > 0.4 ? 'over' : 'under');
     }
 
     function unmountFx(host) {

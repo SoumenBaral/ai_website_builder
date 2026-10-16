@@ -16,8 +16,9 @@
         @endif
         <div class="grid {{ $gridClass }} gap-8">
             @if(!empty($props['items']))
-                @foreach($props['items'] as $item)
-                    <div class="overflow-hidden border border-gray-100 {{ $align === 'left' ? 'text-left' : 'text-center' }}" style="border-radius: var(--radius); background-color: var(--bg);">
+                @foreach($props['items'] as $i => $item)
+                    @php $href = $links[$i] ?? null; @endphp
+                    <{{ $href ? 'a' : 'div' }} @if($href) href="{{ $href }}" aria-label="{{ $item['title'] ?? '' }} — view details" @endif class="group block overflow-hidden border border-gray-100 {{ $align === 'left' ? 'text-left' : 'text-center' }} {{ $href ? 'transition-shadow hover:shadow-xl' : '' }}" style="border-radius: var(--radius); background-color: var(--bg); color: inherit; text-decoration: none;">
                         @if(!empty($item['image']))
                             <img src="{{ $item['image'] }}" alt="{{ $item['title'] ?? '' }}" class="w-full h-40 object-cover">
                         @endif
@@ -27,8 +28,11 @@
                             @endif
                             <h3 class="text-xl font-semibold mb-2" style="font-family: var(--font-heading);">{{ $item['title'] ?? '' }}</h3>
                             <p class="opacity-80">{{ $item['description'] ?? '' }}</p>
+                            @if($href)
+                                @include('export.partials.view-details')
+                            @endif
                         </div>
-                    </div>
+                    </{{ $href ? 'a' : 'div' }}>
                 @endforeach
             @endif
         </div>

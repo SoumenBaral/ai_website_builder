@@ -32,6 +32,11 @@ const editorUrl = computed(() => route('editor.show', props.project.id));
                 <div class="min-w-0">
                     <h3 class="truncate text-[15px] font-semibold text-lp-fg">{{ project.name }}</h3>
                     <p class="mt-0.5 truncate text-[13px] text-lp-muted">{{ project.description || 'No description' }}</p>
+                    <a v-if="project.shop || project.orders" :href="route('orders.index', project.id)" :class="['orders-chip mt-2', project.newOrders && 'orders-chip--new']">
+                        <Icon name="tag" :stroke="1.9" class="size-3.5" />
+                        <template v-if="project.newOrders">{{ project.newOrders }} new order{{ project.newOrders === 1 ? '' : 's' }}</template>
+                        <template v-else>Orders{{ project.orders ? ` · ${project.orders}` : '' }}</template>
+                    </a>
                 </div>
 
                 <AppMenu width="w-52" @open-change="menuOpen = $event">
@@ -44,6 +49,7 @@ const editorUrl = computed(() => route('editor.show', props.project.id));
                         <a :href="editorUrl" class="menu-item" role="menuitem"><Icon name="pencil" :stroke="1.7" class="size-4" />Open editor</a>
                         <a v-if="isLive" :href="`/s/${project.slug}`" target="_blank" rel="noopener" class="menu-item" role="menuitem" @click="close"><Icon name="externalLink" :stroke="1.7" class="size-4" />View live site</a>
                         <a :href="route('analytics.dashboard', project.id)" class="menu-item" role="menuitem"><Icon name="chart" :stroke="1.7" class="size-4" />Analytics</a>
+                        <a :href="route('orders.index', project.id)" class="menu-item" role="menuitem"><Icon name="tag" :stroke="1.7" class="size-4" />Orders</a>
                         <a :href="route('export.download', project.id)" class="menu-item" role="menuitem" @click="close"><Icon name="download" :stroke="1.7" class="size-4" />Download ZIP</a>
                         <div class="menu-sep"></div>
                         <button type="button" class="menu-item menu-item--danger" role="menuitem" @click="close(); emit('delete', project)"><Icon name="trash" :stroke="1.7" class="size-4" />Delete website</button>
@@ -68,6 +74,10 @@ const editorUrl = computed(() => route('editor.show', props.project.id));
 </template>
 
 <style scoped>
+.orders-chip { display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 9999px; border: 1px solid rgb(var(--lp-ink) / 0.1); padding: 0.15rem 0.6rem; font-size: 12px; font-weight: 600; color: rgb(var(--lp-muted)); transition: border-color 0.15s, color 0.15s, background-color 0.15s; }
+.orders-chip:hover { border-color: rgb(139 92 246 / 0.5); color: rgb(var(--lp-fg)); }
+.orders-chip--new { border-color: rgb(139 92 246 / 0.4); background: rgb(139 92 246 / 0.12); color: rgb(124 58 237); }
+:global(.dark) .orders-chip--new, :global([data-theme='dark']) .orders-chip--new { color: rgb(196 181 253); }
 .thumb-frame { box-shadow: inset 0 0 0 1px rgb(var(--lp-ink) / 0.06); }
 .thumb-frame::after {
     content: '';

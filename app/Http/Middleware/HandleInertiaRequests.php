@@ -39,6 +39,10 @@ class HandleInertiaRequests extends Middleware
             'usage' => fn () => $request->user()
                 ? app(AiWebsiteService::class)->getRemainingGenerations($request->user()->id)
                 : null,
+            // Badge on the sidebar's "Orders"
+            'newOrders' => fn () => $request->user()
+                ? \App\Models\Order::where('status', 'new')->whereIn('project_id', $request->user()->projects()->select('id'))->count()
+                : 0,
         ];
     }
 }

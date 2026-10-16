@@ -67,16 +67,21 @@ export function singular(key) {
  */
 export const ITEM_FIELDS = {
     navbar: { links: ['label', 'href'] },
-    features: { items: ['icon', 'image', 'title', 'description'] },
-    services: { items: ['icon', 'image', 'title', 'description', 'price'] },
+    features: { items: ['icon', 'image', 'title', 'description', 'details', 'highlights', 'photos', 'ctaText', 'ctaHref'] },
+    services: { items: ['icon', 'image', 'title', 'description', 'price', 'details', 'highlights', 'photos', 'ctaText', 'ctaHref'] },
     gallery: { images: ['src', 'caption'] },
     testimonials: { items: ['quote', 'author', 'role', 'avatar'] },
     pricing: { plans: ['name', 'price', 'period', 'ctaText', 'highlighted'] },
     stats: { items: ['value', 'label'] },
     faq: { items: ['question', 'answer'] },
-    team: { members: ['image', 'name', 'role', 'bio'] },
+    team: { members: ['image', 'name', 'role', 'bio', 'details', 'highlights', 'ctaText', 'ctaHref'] },
     footer: { links: ['label', 'href'], socials: ['platform', 'url'] },
 };
+
+/** Sections whose cards can open their own details page (mirrors BlockCatalog::ITEM_PAGE_LISTS). */
+export const ITEM_PAGE_LISTS = { services: 'items', features: 'items', team: 'members' };
+/** Card fields edited in the card's "Details page" group, not with the card itself. */
+export const DETAIL_FIELDS = ['details', 'highlights', 'photos', 'ctaText', 'ctaHref'];
 
 /** Lists whose cards can show an icon or a photo. */
 export const CARD_VISUAL_LISTS = { features: 'items', services: 'items' };

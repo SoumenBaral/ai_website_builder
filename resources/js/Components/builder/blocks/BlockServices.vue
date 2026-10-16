@@ -11,6 +11,8 @@ const props = defineProps({
     imageRadius: { type: String, default: '' },
     imageShadow: { type: String, default: '' },
     imageBorder: { type: String, default: '' },
+    itemPages: { type: Boolean, default: false },
+    cart: { type: Boolean, default: false },
     editable: { type: Boolean, default: false },
     id: String,
 });
@@ -81,6 +83,11 @@ function onEditItem(e, index, key) {
                         :contenteditable="editable"
                         @blur="onEditItem($event, i, 'price')"
                     >{{ item.price }}</p>
+                    <span v-if="itemPages" class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold" :style="{ color: 'var(--primary)' }">
+                        <svg v-if="cart" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2" /><circle cx="10" cy="20" r="1.2" /><circle cx="17" cy="20" r="1.2" /></svg>
+                        {{ cart ? 'View & add to cart' : 'View details' }}
+                        <svg class="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                    </span>
                     </div>
                 </div>
             </div>

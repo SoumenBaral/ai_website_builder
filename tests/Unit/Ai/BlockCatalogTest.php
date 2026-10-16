@@ -68,7 +68,7 @@ it('only describes props the Vue blocks actually read (guards against prompt dri
             }
             expect(str_contains($source, $key))->toBeTrue("{$type}.{$key} is not used by Block" . ucfirst($type) . '.vue');
 
-            foreach (array_keys($spec['fields'] ?? []) as $field) {
+            foreach (array_diff(array_keys($spec['fields'] ?? []), BlockCatalog::DETAIL_FIELDS) as $field) {
                 expect($source)->toMatch('/\.' . preg_quote($field, '/') . '\b/', "{$type}.{$key}[].{$field} is not read by the block");
             }
         }

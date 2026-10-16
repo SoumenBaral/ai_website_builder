@@ -29,6 +29,9 @@
 @if(!empty($animations))
     <style>{!! $animations !!}</style>
 @endif
+@if(!empty($shop))
+    <style>{!! $shop['css'] !!}</style>
+@endif
 </head>
 <body @if(!empty($animations)) class="anim-clip" @endif>
 {!! $body !!}
@@ -36,6 +39,12 @@
 <script>
 {!! $animationRuntime !!}
 window.SiteAnim && window.SiteAnim.init();
+</script>
+@endif
+@if(!empty($shop))
+<script>window.__SHOP__ = {!! $shop['config'] !!};</script>
+<script>
+{!! $shop['runtime'] !!}
 </script>
 @endif
 @if(!empty($beacon))

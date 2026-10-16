@@ -171,7 +171,7 @@ it('edits one section, keeps its id and returns a summary', function () {
         ->assertJsonPath('section.type', 'features')
         ->assertJsonPath('section.props.columns', 2);
 
-    OpenAI::assertSent(\OpenAI\Resources\Chat::class, fn ($m, $p) => $p['response_format']['json_schema']['schema']['properties']['props']['properties']['items']['items']['required'] === ['icon', 'title', 'description', 'image']
+    OpenAI::assertSent(\OpenAI\Resources\Chat::class, fn ($m, $p) => $p['response_format']['json_schema']['schema']['properties']['props']['properties']['items']['items']['required'] === ['icon', 'title', 'description', 'image', 'details', 'highlights', 'photos', 'ctaText', 'ctaHref']
         && $p['model'] === 'gpt-4.1-mini');
 });
 

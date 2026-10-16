@@ -11,6 +11,7 @@ const props = defineProps({
     imageRadius: { type: String, default: '' },
     imageShadow: { type: String, default: '' },
     imageBorder: { type: String, default: '' },
+    itemPages: { type: Boolean, default: false },
     editable: { type: Boolean, default: false },
     id: String,
 });
@@ -49,7 +50,7 @@ const gridClass = computed(() => ({
             <div class="grid gap-8" :class="gridClass">
                 <div
                     v-for="(item, i) in items" :key="i"
-                    class="rounded-lg border border-gray-100 hover:shadow-lg transition-shadow overflow-hidden"
+                    class="group rounded-lg border border-gray-100 hover:shadow-lg transition-shadow overflow-hidden"
                     :class="align === 'left' ? 'text-left' : 'text-center'"
                     :style="{ borderRadius: 'var(--radius)' }"
                 >
@@ -69,6 +70,10 @@ const gridClass = computed(() => ({
                             :contenteditable="editable"
                             @blur="onEditItem($event, i, 'description')"
                         >{{ item.description }}</p>
+                        <span v-if="itemPages" class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold" :style="{ color: 'var(--primary)' }">
+                            View details
+                            <svg class="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                        </span>
                     </div>
                 </div>
             </div>

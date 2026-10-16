@@ -5,7 +5,7 @@ import { BLOCK_TYPES } from '@/schema/defaults.js';
 import ImagePicker from '@/Components/builder/ImagePicker.vue';
 import CustomElementEditor from '@/Components/builder/CustomElementEditor.vue';
 import Icon from '@/Components/Landing/Icon.vue';
-import { blockIcons, humanize, singular, ITEM_FIELDS, CARD_VISUAL_LISTS, itemFields } from './blockMeta';
+import { blockIcons, humanize, singular, ITEM_FIELDS, CARD_VISUAL_LISTS, ITEM_PAGE_LISTS, DETAIL_FIELDS, itemFields } from './blockMeta';
 import { useToast } from './useToast';
 import { useLogoStudio } from './useLogoStudio';
 import axios from 'axios';
@@ -14,6 +14,8 @@ import { ANIMATION_INTENT, aiAnimate } from './animPreview';
 import MotionPanel from './MotionPanel.vue';
 
 const projectId = inject('projectId');
+const saveNow = inject('saveNow', null);
+const newOrders = inject('newOrders', 0);
 
 const editor = useEditor();
 const { notify } = useToast();
@@ -28,7 +30,7 @@ const block = computed(() => editor.selectedBlock);
 const blockDef = computed(() => block.value ? BLOCK_TYPES[block.value.type] : null);
 const index = computed(() => (block.value ? editor.schema.sections.findIndex((s) => s.id === block.value.id) : -1));
 const total = computed(() => editor.schema?.sections?.length || 0);
-const STYLE_KEYS = ['sectionBg', 'sectionText', 'imageRadius', 'imageShadow', 'imageBorder', 'animation', 'animationSpeed', 'animationStagger', 'hoverEffect', 'buttonEffect', 'textEffect', 'textSpeed', 'typingPhrases', 'customAnimation', 'bgEffect'];
+const STYLE_KEYS = ['sectionBg', 'sectionText', 'imageRadius', 'imageShadow', 'imageBorder', 'animation', 'animationSpeed', 'animationStagger', 'hoverEffect', 'buttonEffect', 'textEffect', 'textSpeed', 'typingPhrases', 'customAnimation', 'bgEffect', 'itemPages', 'cart'];
 
 // Multi-line fields are chosen by name (not length) so the control never swaps mid-typing.
 const LONG_TEXT = ['body', 'description', 'subheading', 'text', 'content', 'answer', 'quote', 'bio', 'message', 'about', 'paragraph'];
@@ -44,12 +46,54 @@ function cardVisual(items) {
 }
 
 function visibleItemFields(key, items) {
-    let fields = itemFields(block.value.type, key, items);
+    // Details-page fields have their own group (shown when the section's details pages are on).
+    let fields = itemFields(block.value.type, key, items).filter((f) => !DETAIL_FIELDS.includes(f));
     if (CARD_VISUAL_LISTS[block.value.type] === key) {
         const mode = cardVisual(items);
         fields = fields.filter((f) => (f === 'icon' ? mode === 'icon' : f === 'image' ? mode === 'photo' : true));
     }
     return fields;
+}
+
+/* ---------- Card details pages ---------- */
+const detailsOn = computed(() => !!block.value?.props.itemPages);
+const isPageList = (key) => ITEM_PAGE_LISTS[block.value?.type] === key;
+const missingDetails = (items) => items.filter((it) => !String(it.details || '').trim()).length;
+
+const cartOn = computed(() => !!block.value?.props.cart);
+function setCart(on) {
+    update('cart', on);
+    if (on && !detailsOn.value) update('itemPages', true);
+    if (on) notify('Shop is on: product pages now have "Add to cart", and orders arrive in Orders.', 'success', { duration: 6500 });
+}
+
+function setItemPages(on) {
+    update('itemPages', on);
+    if (on) notify('Each card now opens its own details page. Fill in the details below — or let the AI write them.', 'success', { duration: 6000 });
+}
+
+function writeDetailsWithAi(key) {
+    aiMode.value = 'section';
+    const noun = block.value.type === 'team' ? 'team member' : 'card';
+    askAi(`Turn on details pages and write the details page for every ${noun}: 2–3 short, specific paragraphs and 3–5 highlights each, plus a fitting button label. Keep all existing text, prices and photos exactly as they are.`);
+}
+
+function addPhoto(key, i, url) {
+    if (!url) return;
+    const photos = [...(block.value.props[key][i].photos || [])];
+    if (!photos.includes(url)) updateNested(key, i, 'photos', [...photos, url].slice(0, 6));
+}
+function removePhoto(key, i, n) {
+    updateNested(key, i, 'photos', (block.value.props[key][i].photos || []).filter((_, k) => k !== n));
+}
+
+/** Open the card's real details page (saving first so it shows the latest edits). */
+async function previewDetails(i) {
+    const url = route('export.previewCard', { project: projectId, sectionId: block.value.id, index: i });
+    const tab = window.open('', '_blank'); // open now so pop-up blockers allow it
+    if (saveNow) await saveNow();
+    if (tab) tab.location.href = url;
+    else window.open(url, '_blank');
 }
 
 function addItem(key, items) {
@@ -462,6 +506,48 @@ const quickActions = computed(() => {
                                 <label class="ed-label !mb-0">{{ humanize(key) }} <span class="text-lp-subtle">· {{ value.length }}</span></label>
                             </div>
 
+                            <!-- Details pages: each card opens its own page -->
+                            <div v-if="isPageList(key)" :class="['details-box mb-3', detailsOn && 'details-box--on']">
+                                <label class="flex cursor-pointer items-start justify-between gap-3">
+                                    <span class="min-w-0">
+                                        <span class="flex items-center gap-1.5 text-[12px] font-semibold text-lp-text"><Icon name="externalLink" :stroke="1.9" class="size-3.5 text-lp-accent" />Details pages</span>
+                                        <span class="mt-0.5 block text-[11px] leading-snug text-lp-subtle">Clicking a {{ block.type === 'team' ? 'person' : 'card' }} opens its own page with photos, full description{{ block.type === 'services' ? ', price' : '' }} and a button.</span>
+                                    </span>
+                                    <button type="button" role="switch" :aria-checked="detailsOn" :class="['toggle mt-0.5', detailsOn && 'toggle--on']" @click="setItemPages(!detailsOn)"><span></span></button>
+                                </label>
+                                <template v-if="detailsOn">
+                                    <button type="button" class="logo-ai-btn mt-2.5" :disabled="aiLoading" @click="writeDetailsWithAi(key)">
+                                        <svg v-if="aiLoading" viewBox="0 0 24 24" fill="none" class="size-4 animate-spin"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg>
+                                        <Icon v-else name="sparkles" :stroke="1.8" class="size-4" />
+                                        {{ missingDetails(value) ? `Write details for ${missingDetails(value) === value.length ? 'every' : missingDetails(value)} ${missingDetails(value) === 1 ? singular(key) : 'card'}${missingDetails(value) > 1 && missingDetails(value) < value.length ? 's' : ''} with AI` : 'Rewrite all details with AI' }}
+                                    </button>
+                                    <p class="mt-2 text-[11px] text-lp-subtle">Open a card below → <span class="font-medium text-lp-muted">Details page</span> to edit it or preview it.</p>
+
+                                    <!-- Online shop -->
+                                    <div v-if="block.type === 'services'" class="mt-3 border-t border-lp-ink/[0.07] pt-3">
+                                        <label class="flex cursor-pointer items-start justify-between gap-3">
+                                            <span class="min-w-0">
+                                                <span class="flex items-center gap-1.5 text-[12px] font-semibold text-lp-text">
+                                                    <svg class="size-3.5 text-lp-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2" /><circle cx="10" cy="20" r="1.2" /><circle cx="17" cy="20" r="1.2" /></svg>
+                                                    Add to cart
+                                                </span>
+                                                <span class="mt-0.5 block text-[11px] leading-snug text-lp-subtle">Visitors pick a quantity, add items to a cart and send you an order (no online payment).</span>
+                                            </span>
+                                            <button type="button" role="switch" :aria-checked="cartOn" :class="['toggle mt-0.5', cartOn && 'toggle--on']" @click="setCart(!cartOn)"><span></span></button>
+                                        </label>
+                                        <div v-if="cartOn" class="mt-2 space-y-1.5">
+                                            <p v-if="value.some((it) => !it.price)" class="text-[11px] text-amber-600">{{ value.filter((it) => !it.price).length }} item(s) have no price — they'll show as “Price on request”.</p>
+                                            <a :href="route('orders.index', projectId)" class="flex items-center justify-between rounded-lg border border-lp-ink/[0.08] px-2.5 py-1.5 text-[11.5px] font-semibold text-lp-text transition hover:border-violet-400/60">
+                                                View orders
+                                                <span v-if="newOrders" class="rounded-full bg-violet-500 px-1.5 text-[10px] leading-4 text-white">{{ newOrders }} new</span>
+                                                <Icon v-else name="arrowUpRight" :stroke="2" class="size-3 text-lp-subtle" />
+                                            </a>
+                                            <p class="text-[11px] text-lp-subtle">Orders only work on the published site. Customers can also order on WhatsApp if your Contact section has a phone number.</p>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
                             <!-- Card visual: icon, photo or nothing -->
                             <div v-if="CARD_VISUAL_LISTS[block.type] === key" class="visual-box mb-3">
                                 <div class="text-[11px] font-medium text-lp-muted">Card visual</div>
@@ -485,6 +571,7 @@ const quickActions = computed(() => {
                                         <img v-if="item.image || item.avatar || item.src" :src="item.image || item.avatar || item.src" alt="" class="size-6 shrink-0 rounded object-cover" />
                                         <span v-else-if="item.icon" class="w-6 shrink-0 text-center text-sm">{{ item.icon }}</span>
                                         <span class="min-w-0 flex-1 truncate">{{ item.title || item.label || item.name || item.question || item.value || item.author || item.caption || `${singular(key)} ${i + 1}` }}</span>
+                                        <span v-if="isPageList(key) && detailsOn && !String(item.details || '').trim()" class="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] font-semibold text-amber-600" title="This card's details page has no description yet">No details</span>
                                         <button type="button" class="ed-icon-btn ed-icon-btn--danger size-6" :title="`Remove ${singular(key)}`" @click.prevent="removeArrayItem(key, i)"><Icon name="xMark" :stroke="2" class="size-3.5" /></button>
                                     </summary>
                                     <div class="space-y-2.5 border-t border-lp-ink/[0.06] px-3 pb-3 pt-2.5">
@@ -501,6 +588,46 @@ const quickActions = computed(() => {
                                                 <textarea v-else-if="isLongText(field) || field === 'quote'" :value="item[field] || ''" rows="3" class="ed-textarea ed-input-sm" @input="updateNested(key, i, field, $event.target.value)"></textarea>
                                                 <input v-else type="text" :value="item[field] ?? ''" :placeholder="field === 'icon' ? 'e.g. 👕' : humanize(field)" :class="['ed-input ed-input-sm', field === 'icon' && '!w-20 text-center !text-base']" @input="updateNested(key, i, field, $event.target.value)" />
                                             </template>
+                                        </div>
+
+                                        <!-- This card's details page -->
+                                        <div v-if="isPageList(key) && detailsOn" class="page-box">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-[11px] font-semibold uppercase tracking-wider text-lp-accent">Details page</span>
+                                                <button type="button" class="inline-flex items-center gap-1 text-[11px] font-semibold text-lp-accent hover:opacity-80" @click="previewDetails(i)">
+                                                    Preview page<Icon name="arrowUpRight" :stroke="2" class="size-3" />
+                                                </button>
+                                            </div>
+                                            <div>
+                                                <label class="ed-label !text-[11px]">Full description</label>
+                                                <textarea :value="item.details || ''" rows="5" placeholder="A few short paragraphs: what it is, what's included, who it's for. Leave a blank line between paragraphs." class="ed-textarea ed-input-sm" @input="updateNested(key, i, 'details', $event.target.value)"></textarea>
+                                            </div>
+                                            <div>
+                                                <label class="ed-label !text-[11px]">Highlights <span class="font-normal text-lp-subtle">· one per line, shown as a checklist</span></label>
+                                                <textarea :value="(item.highlights || []).join('\n')" rows="3" placeholder="100% organic cotton&#10;Free returns within 30 days" class="ed-textarea ed-input-sm" @change="updateNested(key, i, 'highlights', $event.target.value.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 6))"></textarea>
+                                            </div>
+                                            <div v-if="block.type !== 'team'">
+                                                <label class="ed-label !text-[11px]">More photos <span class="font-normal text-lp-subtle">· shown as a gallery</span></label>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    <div v-for="(photo, n) in item.photos || []" :key="photo" class="group/ph relative size-12 overflow-hidden rounded-md border border-lp-ink/10">
+                                                        <img :src="photo" alt="" class="size-full object-cover" />
+                                                        <button type="button" class="absolute inset-0 flex items-center justify-center bg-black/55 text-white opacity-0 transition-opacity group-hover/ph:opacity-100" title="Remove photo" @click="removePhoto(key, i, n)"><Icon name="xMark" :stroke="2.2" class="size-4" /></button>
+                                                    </div>
+                                                </div>
+                                                <div v-if="(item.photos || []).length < 6" class="mt-1.5">
+                                                    <ImagePicker :model-value="''" :project-id="projectId" @update:model-value="addPhoto(key, i, $event)" />
+                                                </div>
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label class="ed-label !text-[11px]">Button text</label>
+                                                    <input type="text" :value="item.ctaText || ''" :placeholder="item.price ? 'Order now' : 'Get in touch'" class="ed-input ed-input-sm" @input="updateNested(key, i, 'ctaText', $event.target.value)" />
+                                                </div>
+                                                <div>
+                                                    <label class="ed-label !text-[11px]">Button link</label>
+                                                    <input type="text" :value="item.ctaHref || ''" placeholder="#contact" class="ed-input ed-input-sm" @input="updateNested(key, i, 'ctaHref', $event.target.value)" />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </details>
@@ -583,6 +710,23 @@ const quickActions = computed(() => {
 </template>
 
 <style scoped>
+.details-box {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--lp-ink) / 0.09);
+    background: rgb(var(--lp-ink) / 0.02);
+    padding: 0.7rem 0.75rem;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+.details-box--on { border-color: rgb(139 92 246 / 0.35); background: linear-gradient(180deg, rgb(139 92 246 / 0.08), rgb(139 92 246 / 0.02)); }
+.page-box {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 0.35rem;
+    border-radius: 0.6rem;
+    border: 1px dashed rgb(139 92 246 / 0.35);
+    background: rgb(139 92 246 / 0.04);
+    padding: 0.65rem;
+}
 .ai-card {
     border: 1px solid rgb(139 92 246 / 0.25);
     background: linear-gradient(180deg, rgb(139 92 246 / 0.09), rgb(139 92 246 / 0.02));

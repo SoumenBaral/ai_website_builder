@@ -5,6 +5,7 @@ const props = defineProps({
     heading: String,
     members: Array,
     columns: { type: Number, default: 4 },
+    itemPages: { type: Boolean, default: false },
     editable: { type: Boolean, default: false },
     id: String,
 });
@@ -78,6 +79,10 @@ function onEditMember(e, index, key) {
                         :contenteditable="editable"
                         @blur="onEditMember($event, i, 'bio')"
                     >{{ member.bio }}</p>
+                    <span v-if="itemPages" class="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold" :style="{ color: 'var(--primary)' }">
+                        View profile
+                        <svg class="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                    </span>
                 </div>
             </div>
         </div>

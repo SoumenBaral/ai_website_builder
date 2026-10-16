@@ -29,6 +29,12 @@ class ProjectController extends Controller
             ->groupBy('project_id')
             ->pluck('views', 'project_id');
 
+        // Orders per website (all + new), one grouped query.
+        $orders = \App\Models\Order::whereIn('project_id', $projects->pluck('id'))
+            ->selectRaw("project_id, COUNT(*) as total, SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) as fresh")
+            ->groupBy('project_id')
+            ->get()->keyBy('project_id');
+
         return Inertia::render('Dashboard', [
             'projects' => $projects->map(fn (Project $project) => [
                 'id' => $project->id,
@@ -41,6 +47,9 @@ class ProjectController extends Controller
                 'created_at' => $project->created_at,
                 'updated_at' => $project->updated_at,
                 'preview' => $this->previewFor($project),
+                'shop' => \App\Services\Shop\Shop::enabled($project->homePage?->schema ?? []),
+                'orders' => (int) ($orders[$project->id]->total ?? 0),
+                'newOrders' => (int) ($orders[$project->id]->fresh ?? 0),
             ])->values(),
         ]);
     }

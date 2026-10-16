@@ -12,8 +12,9 @@
         @endphp
         <div class="grid {{ $gridClass }} gap-8">
             @if(!empty($props['members']))
-                @foreach($props['members'] as $member)
-                    <div class="text-center">
+                @foreach($props['members'] as $i => $member)
+                    @php $href = $links[$i] ?? null; @endphp
+                    <{{ $href ? 'a' : 'div' }} @if($href) href="{{ $href }}" aria-label="{{ $member['name'] ?? '' }} — view profile" @endif class="group block text-center" style="color: inherit; text-decoration: none;">
                         @if(!empty($member['image']))
                             <img
                                 src="{{ $member['image'] }}"
@@ -31,7 +32,13 @@
                                 {{ $member['role'] }}
                             </p>
                         @endif
-                    </div>
+                        @if(!empty($member['bio']))
+                            <p class="mt-2 text-sm opacity-70">{{ $member['bio'] }}</p>
+                        @endif
+                        @if($href)
+                            @include('export.partials.view-details', ['label' => 'View profile'])
+                        @endif
+                    </{{ $href ? 'a' : 'div' }}>
                 @endforeach
             @endif
         </div>

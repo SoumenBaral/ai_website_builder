@@ -16,6 +16,7 @@ class Project extends Model
     public function user() { return $this->belongsTo(User::class); }
     public function pages() { return $this->hasMany(Page::class); }
     public function homePage() { return $this->hasOne(Page::class)->where('is_home', true); }
+    public function orders() { return $this->hasMany(Order::class); }
     public function assets() { return $this->hasMany(Asset::class); }
     public function deployments() { return $this->hasMany(Deployment::class); }
     public function aiGenerations() { return $this->hasMany(AiGeneration::class); }

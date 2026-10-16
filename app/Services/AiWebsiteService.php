@@ -111,7 +111,7 @@ class AiWebsiteService
 
         $schema = $this->finalizeSite($data, ensureFrame: false, hint: $currentSchema['meta']['title'] ?? '');
         $originals = collect($currentSchema['sections'] ?? [])->keyBy('id');
-        $schema['sections'] = array_map(fn ($s) => $this->keepMotion($s, $originals[$s['id']] ?? null), $schema['sections']);
+        $schema['sections'] = array_map(fn ($s) => $this->keepCardVisual($this->keepMotion($s, $originals[$s['id']] ?? null), $originals[$s['id']] ?? null, $instruction), $schema['sections']);
 
         return ['schema' => $schema, 'summary' => $summary];
     }
@@ -147,6 +147,7 @@ class AiWebsiteService
         );
         $updated['id'] = $section['id'] ?? $updated['id'];
         $updated = $this->keepMotion($updated, $section);
+        $updated = $this->keepCardVisual($updated, $section, $instruction);
 
         // Resolve new photos without repeating ones already in this section.
         $updated = $this->imageResolver->resolvePlaceholders(['sections' => [$updated]], $type)['sections'][0];
@@ -434,6 +435,27 @@ class AiWebsiteService
         if (($before['animation'] ?? null) === 'custom' && !empty($before['customAnimation'])
             && in_array($section['props']['animation'] ?? null, [null, 'custom', 'fade-up'], true)) {
             $section['props']['animation'] = 'custom';
+        }
+
+        return $section;
+    }
+
+    /**
+     * Cards show a photo, an icon or nothing — the user's choice. An edit that isn't about
+     * icons must not sprinkle emoji onto photo cards (or strip icons the user picked).
+     */
+    private function keepCardVisual(array $section, ?array $original, string $instruction): array
+    {
+        $list = ['features' => 'items', 'services' => 'items'][$section['type'] ?? ''] ?? null;
+        if (!$list || !$original || preg_match('/\b(icons?|emojis?)\b|আইকন/iu', $instruction)) {
+            return $section;
+        }
+        $before = $original['props'][$list] ?? [];
+        $hadIcons = (bool) array_filter($before, fn ($item) => !empty($item['icon']));
+        if (!$hadIcons) {
+            foreach ($section['props'][$list] ?? [] as $n => $item) {
+                unset($section['props'][$list][$n]['icon']);
+            }
         }
 
         return $section;

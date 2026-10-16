@@ -15,6 +15,7 @@ const { openCreate } = useCreateProject();
 
 const nav = [
     { label: 'Websites', icon: 'home', route: 'dashboard', active: () => route().current('dashboard') || route().current('analytics.*') },
+    { label: 'Orders', icon: 'tag', route: 'orders.all', active: () => route().current('orders.*'), badge: () => page.props.newOrders },
     { label: 'Settings', icon: 'cog', route: 'profile.edit', active: () => route().current('profile.*') },
 ];
 const resources = [
@@ -62,6 +63,7 @@ function create() {
                     @click="emit('navigate')"
                 >
                     <Icon :name="item.icon" :stroke="1.7" class="size-[18px]" />{{ item.label }}
+                    <span v-if="item.badge?.()" class="ml-auto rounded-full bg-violet-500 px-1.5 text-[11px] font-bold leading-[18px] text-white" :aria-label="`${item.badge()} new`">{{ item.badge() }}</span>
                 </Link>
             </div>
             <div>

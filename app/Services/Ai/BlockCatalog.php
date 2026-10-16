@@ -50,6 +50,12 @@ final class BlockCatalog
     /** Effects for the section's main heading (see resources/js/site/animRuntime.js). */
     public const TEXT_EFFECTS = ['none', 'typing', 'typing-loop', 'words', 'letters', 'gradient', 'highlight'];
 
+    /** Sections whose cards can open their own details page, and the list holding the cards. */
+    public const ITEM_PAGE_LISTS = ['services' => 'items', 'features' => 'items', 'team' => 'members'];
+
+    /** Card fields used only on the details page (the editor's card view doesn't read them). */
+    public const DETAIL_FIELDS = ['details', 'highlights', 'photos', 'ctaText', 'ctaHref'];
+
     /** Props applied by BlockRenderer / the export wrapper rather than by the block itself. */
     public const WRAPPER_PROPS = ['sectionBg', 'sectionText', 'animation', 'animationSpeed', 'animationStagger', 'hoverEffect', 'buttonEffect', 'textEffect', 'textSpeed'];
 
@@ -319,6 +325,20 @@ final class BlockCatalog
             ],
         ];
 
+        // Cards that open a details page: the long-form fields live on each card.
+        $detailFields = [
+            'details' => self::text('Details page only: 2–3 short paragraphs separated by a blank line ("\\n\\n"), concrete and specific, max 110 words. Leave null unless itemPages is true'),
+            'highlights' => self::strings(0, 6, 'Details page only: 3–5 short selling points (max 8 words each), or [] unless itemPages is true'),
+            'photos' => self::strings(0, 6, 'Extra photo URLs uploaded by the user — always copy as-is; never invent ([] if none)'),
+            'ctaText' => self::text('The ACTION button on the item\'s own page, 2–3 words: "Order now", "Buy now", "Book this session", "Reserve a table", "Enquire now". Never "View…/See…/Explore…/Discover…" (the visitor is already on the page). null = site default'),
+            'ctaHref' => self::text('Details page button link, usually "#contact"; null = site default'),
+        ];
+        foreach (self::ITEM_PAGE_LISTS as $type => $list) {
+            $blocks[$type]['props'][$list]['fields'] += $detailFields;
+            $blocks[$type]['props']['itemPages'] = self::flag('true = each card links to its own details page (products, services, menu items, team profiles)');
+        }
+        $blocks['services']['props']['cart'] = self::flag('Online shop: true = details pages get "Add to cart" and visitors can send an order (needs itemPages true). Only for physical products/menu items people buy.');
+
         // Every section can override its own colours.
         foreach ($blocks as &$block) {
             $block['props']['sectionBg'] = self::color('Optional section background colour (hex). Use sparingly for rhythm; always pair with sectionText.');
@@ -544,6 +564,7 @@ final class BlockCatalog
             $lines[] = "- {$type}: {$block['purpose']}\n    [" . implode('; ', $props) . "]{$styling}";
         }
         $lines[] = '- Every section also accepts sectionBg + sectionText (hex) to override its colours.';
+        $lines[] = '- Details pages (services, features, team): itemPages true makes every card open its own page; then give each card details (2–3 short paragraphs), 3–5 highlights and optionally ctaText/ctaHref. photos are user uploads: copy them, never invent.';
         $lines[] = '- Image styling: imageRadius (none|sm|md|lg|xl|full), imageShadow (none|sm|md|lg|xl), imageBorder (none|thin|thick).';
         $lines[] = '- Animation (every section): animation (' . implode('|', self::ANIMATIONS) . '), animationSpeed (fast|normal|slow), animationStagger (true = content appears one by one), hoverEffect (' . implode('|', self::HOVER_EFFECTS) . '), buttonEffect (' . implode('|', self::BUTTON_EFFECTS) . '), textEffect (' . implode('|', self::TEXT_EFFECTS) . ') + textSpeed on the main heading.';
 

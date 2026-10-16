@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'track', // analytics beacon from published sites
+            's/*/orders', // public checkout on published sites (no session; throttled + honeypot)
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -195,6 +195,15 @@ final class SchemaNormalizer
             }
         }
 
+        // Details-page buttons are actions; "View details" on the details page itself makes no sense.
+        if ($list = BlockCatalog::ITEM_PAGE_LISTS[$type] ?? null) {
+            foreach ($clean[$list] ?? [] as $n => $item) {
+                if (isset($item['ctaText']) && preg_match('/^(view|see|explore|discover|learn more|read more|details)\b/i', $item['ctaText'])) {
+                    unset($clean[$list][$n]['ctaText']);
+                }
+            }
+        }
+
         // AI-designed motion (data only, clamped).
         if ($effect = MotionSpec::effect($props['bgEffect'] ?? null)) {
             $clean['bgEffect'] = $effect;
@@ -223,7 +232,8 @@ final class SchemaNormalizer
     {
         switch ($spec['kind']) {
             case 'string':
-                return $this->cleanString($value);
+                // Long descriptions keep their paragraph breaks (blank lines).
+                return $this->cleanString($value, keepParagraphs: str_ends_with($path, '.details'));
 
             case 'image':
                 $str = $this->cleanString($value);
@@ -316,7 +326,7 @@ final class SchemaNormalizer
         return false;
     }
 
-    private function cleanString(mixed $value): ?string
+    private function cleanString(mixed $value, bool $keepParagraphs = false): ?string
     {
         if (!is_scalar($value)) {
             return null;
@@ -327,7 +337,12 @@ final class SchemaNormalizer
             $raw = strip_tags($raw);
             $this->fixes[] = 'Removed HTML from a text field';
         }
-        $str = trim(preg_replace('/\s+/u', ' ', $raw) ?? '');
+        if ($keepParagraphs) {
+            $paragraphs = preg_split('/\R\s*\R|\\n\\n/u', $raw); // real or escaped blank lines
+            $str = implode("\n\n", array_filter(array_map(fn ($p) => trim(preg_replace('/\s+/u', ' ', $p) ?? ''), $paragraphs)));
+        } else {
+            $str = trim(preg_replace('/\s+/u', ' ', $raw) ?? '');
+        }
 
         return $str === '' ? null : $str;
     }

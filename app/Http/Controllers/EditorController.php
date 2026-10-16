@@ -19,6 +19,7 @@ class EditorController extends Controller
         return Inertia::render('Editor', [
             'project' => $project,
             'page' => $page,
+            'newOrders' => $project->orders()->where('status', 'new')->count(),
         ]);
     }
 }
