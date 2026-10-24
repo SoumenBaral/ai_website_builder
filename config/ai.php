@@ -78,4 +78,18 @@ return [
 
     // Optional: real photo search. Without a key, a curated, verified library is used.
     'unsplash_access_key' => env('UNSPLASH_ACCESS_KEY'),
+
+    /*
+    | Stock photo catalog (stock_photos table): `photos:import` fills it from Pexels,
+    | `photos:analyze` describes every photo with a vision model. When the catalog
+    | holds photos, the AI resolver and the picker use it instead of the built-in library.
+    */
+    'photos' => [
+        'pexels_key' => env('PEXELS_API_KEY'),
+        // Which provider describes the photos (needs vision). Empty = the main AI provider.
+        'analyze_provider' => env('AI_PHOTO_ANALYZE_PROVIDER', 'openai'),
+        'analyze_model' => env('AI_PHOTO_ANALYZE_MODEL', 'gpt-4.1-mini'),
+        // Let the AI choose between the top candidates for the hero / about photo (one small text call).
+        'rerank' => (bool) env('AI_PHOTO_RERANK', true),
+    ],
 ];

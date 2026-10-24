@@ -15,7 +15,8 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         // The AI backend (OpenAI or Puku) is chosen from config/ai.php at first use.
-        $this->app->singleton(ChatProvider::class, fn () => ProviderResolver::fromConfig()->resolve());
+        $this->app->singleton(ProviderResolver::class, fn () => ProviderResolver::fromConfig());
+        $this->app->singleton(ChatProvider::class, fn () => $this->app->make(ProviderResolver::class)->resolve());
     }
 
     /**

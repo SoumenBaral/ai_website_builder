@@ -97,7 +97,7 @@ class PukuProvider implements ChatProvider
     private function build(ChatRequest $request, string $mode, bool $stream): array
     {
         $system = $request->systemPrompt();
-        $messages = array_map(fn ($m) => ['role' => $m['role'], 'content' => $m['content']], $request->conversation());
+        $messages = array_map(fn ($m) => ['role' => $m['role'], 'content' => self::content($m['content'])], $request->conversation());
         $headers = [];
         $prefill = '';
 
@@ -133,6 +133,27 @@ class PukuProvider implements ChatProvider
         }
 
         return [$body, $headers, $prefill];
+    }
+
+    /** OpenAI-style content parts → Anthropic content blocks (strings pass through). */
+    private static function content(string|array $content): string|array
+    {
+        if (is_string($content)) {
+            return $content;
+        }
+        $blocks = [];
+        foreach ($content as $part) {
+            if (($part['type'] ?? '') === 'image_url') {
+                $url = is_array($part['image_url']) ? $part['image_url']['url'] : $part['image_url'];
+                $blocks[] = str_starts_with($url, 'data:')
+                    ? ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => explode(';', substr($url, 5))[0], 'data' => substr($url, strpos($url, ',') + 1)]]
+                    : ['type' => 'image', 'source' => ['type' => 'url', 'url' => $url]];
+            } elseif (($part['type'] ?? '') === 'text') {
+                $blocks[] = ['type' => 'text', 'text' => $part['text']];
+            }
+        }
+
+        return $blocks;
     }
 
     private function http(array $headers, bool $stream): PendingRequest

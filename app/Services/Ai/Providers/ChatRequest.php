@@ -6,12 +6,14 @@ namespace App\Services\Ai\Providers;
  * A provider-neutral "give me JSON matching this schema" request.
  *
  * Messages use the OpenAI shape ({role, content}) with roles system|user|assistant;
- * each provider maps them to its own wire format.
+ * each provider maps them to its own wire format. `content` is a string, or for
+ * vision requests a list of parts in OpenAI form:
+ *   {type: "text", text: …} | {type: "image_url", image_url: {url: …, detail?: "low"|"high"}}
  */
 final class ChatRequest
 {
     /**
-     * @param array<int, array{role: string, content: string}> $messages
+     * @param array<int, array{role: string, content: string|array}> $messages
      */
     public function __construct(
         public readonly string $model,
@@ -28,14 +30,14 @@ final class ChatRequest
         $parts = [];
         foreach ($this->messages as $message) {
             if (($message['role'] ?? '') === 'system') {
-                $parts[] = $message['content'];
+                $parts[] = is_array($message['content']) ? implode("\n", array_column($message['content'], 'text')) : $message['content'];
             }
         }
 
         return $parts ? implode("\n\n", $parts) : null;
     }
 
-    /** @return array<int, array{role: string, content: string}> user/assistant turns only */
+    /** @return array<int, array{role: string, content: string|array}> user/assistant turns only */
     public function conversation(): array
     {
         return array_values(array_filter($this->messages, fn ($m) => ($m['role'] ?? '') !== 'system'));
