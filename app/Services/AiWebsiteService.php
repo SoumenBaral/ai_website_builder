@@ -8,21 +8,21 @@ use App\Services\Ai\AiException;
 use App\Services\Ai\BlockCatalog;
 use App\Services\Ai\MotionSpec;
 use App\Services\Ai\Prompts;
+use App\Services\Ai\Providers\ChatProvider;
+use App\Services\Ai\Providers\ChatRequest;
+use App\Services\Ai\Providers\ProviderException;
 use App\Services\Ai\SchemaNormalizer;
 use App\Services\Logo\LogoDesigner;
 use Illuminate\Support\Facades\Log;
-use OpenAI\Exceptions\ErrorException;
-use OpenAI\Exceptions\RateLimitException;
-use OpenAI\Exceptions\ServerException;
-use OpenAI\Exceptions\TransporterException;
-use OpenAI\Exceptions\UnserializableResponse;
-use OpenAI\Laravel\Facades\OpenAI;
 
 /**
- * Generates and edits websites with OpenAI structured outputs.
+ * Generates and edits websites with schema-constrained AI output.
+ *
+ * The vendor (OpenAI or Puku, see config/ai.php) is behind the ChatProvider
+ * interface; this class only deals in prompts, schemas and results.
  *
  * Pipeline for every request:
- *   strict JSON schema (BlockCatalog) → OpenAI (streamed when a progress
+ *   strict JSON schema (BlockCatalog) → provider (streamed when a progress
  *   callback is given) → truncation / JSON checks with one retry →
  *   SchemaValidator (structure) → SchemaNormalizer (repair & polish) →
  *   ImageResolver (real photos).
@@ -34,7 +34,14 @@ class AiWebsiteService
         private ImageResolver $imageResolver,
         private SchemaNormalizer $normalizer,
         private LogoDesigner $logoDesigner,
+        private ChatProvider $provider,
     ) {}
+
+    /** The configured backend, e.g. for showing "Powered by …" or in ai:doctor. */
+    public function provider(): ChatProvider
+    {
+        return $this->provider;
+    }
 
     /**
      * Generate a complete website from a prompt.
@@ -47,7 +54,7 @@ class AiWebsiteService
             $this->enforceGenerationCap($userId);
         }
 
-        $model = config('ai.models.generate');
+        $model = $this->provider->model('generate');
         $result = $this->requestJson(
             model: $model,
             messages: [
@@ -92,7 +99,7 @@ class AiWebsiteService
     public function editSchema(array $currentSchema, string $instruction, ?int $userId = null, ?callable $onProgress = null): array
     {
         $result = $this->requestJson(
-            model: config('ai.models.edit'),
+            model: $this->provider->model('edit'),
             messages: [
                 ['role' => 'system', 'content' => Prompts::editSite()],
                 ['role' => 'user', 'content' => "Instruction: {$instruction}\n\nCurrent website JSON:\n" . json_encode($this->forModel($currentSchema), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)],
@@ -129,7 +136,7 @@ class AiWebsiteService
         }
 
         $result = $this->requestJson(
-            model: config('ai.models.edit'),
+            model: $this->provider->model('edit'),
             messages: [
                 ['role' => 'system', 'content' => Prompts::editSection($type)],
                 ['role' => 'user', 'content' => "Instruction: {$instruction}\n\nTheme: " . json_encode($theme, JSON_UNESCAPED_SLASHES)
@@ -272,7 +279,7 @@ class AiWebsiteService
             ],
         ];
 
-        $model = config('ai.models.edit');
+        $model = $this->provider->model('edit');
         $result = $this->requestJson(
             model: $model,
             messages: [
@@ -373,7 +380,7 @@ class AiWebsiteService
 
         try {
             $result = $this->requestJson(
-                model: config('ai.models.edit'),
+                model: $this->provider->model('edit'),
                 messages: [
                     ['role' => 'system', 'content' => LogoDesigner::prompt()],
                     ['role' => 'user', 'content' => json_encode($brief, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)],
@@ -482,9 +489,9 @@ class AiWebsiteService
     }
 
     /**
-     * Call OpenAI with a strict JSON schema. Retries once on truncated/invalid
-     * output. When $onProgress is given the response is streamed and progress
-     * events are emitted as the JSON arrives.
+     * Ask the provider for JSON matching a strict schema. Retries once on
+     * truncated/invalid output or transport errors. When $onProgress is given
+     * the response is streamed and progress events are emitted as the JSON arrives.
      *
      * @return array{data: array, usage: array{input: ?int, output: ?int}}
      */
@@ -498,52 +505,49 @@ class AiWebsiteService
         ?callable $onProgress = null,
         int $expectedTokens = 3000,
     ): array {
-        $params = [
-            'model' => $model,
-            'messages' => $messages,
-            'temperature' => $temperature,
-            'max_completion_tokens' => $maxTokens,
-            'response_format' => [
-                'type' => 'json_schema',
-                'json_schema' => ['name' => $schemaName, 'strict' => true, 'schema' => $schema],
-            ],
-        ];
+        $request = new ChatRequest($model, $messages, $schemaName, $schema, $maxTokens, $temperature);
+        $vendor = $this->provider->label();
 
         $attempts = 1 + max(0, (int) config('ai.retries'));
         $lastError = null;
 
         for ($attempt = 1; $attempt <= $attempts; $attempt++) {
             try {
-                [$content, $finish, $usage] = $onProgress
-                    ? $this->stream($params, $onProgress, $expectedTokens)
-                    : $this->complete($params);
+                $result = $onProgress
+                    ? $this->provider->stream($request, $this->progressReporter($onProgress, $expectedTokens))
+                    : $this->provider->complete($request);
 
-                if ($finish === 'length') {
-                    throw new \RuntimeException('Output truncated at max_completion_tokens');
+                if ($result->truncated()) {
+                    throw new \RuntimeException('Output truncated at max tokens');
                 }
 
-                $data = json_decode($content ?? '', true);
+                $data = json_decode($result->content ?? '', true);
                 if (!is_array($data)) {
                     throw new \RuntimeException('Model output was not valid JSON');
                 }
 
-                return ['data' => $data, 'usage' => $usage];
-            } catch (RateLimitException $e) {
-                Log::warning('OpenAI rate limited', ['model' => $model]);
+                return ['data' => $data, 'usage' => $result->usage];
+            } catch (ProviderException $e) {
+                switch ($e->kind) {
+                    case ProviderException::RATE_LIMITED:
+                        Log::warning("{$vendor} rate limited", ['model' => $model, 'error' => $e->getMessage()]);
 
-                throw AiException::unavailable($e);
-            } catch (ErrorException $e) {
-                // API rejected the request (bad key, quota, invalid schema): retrying won't help.
-                Log::error('OpenAI request rejected', ['model' => $model, 'error' => $e->getMessage()]);
+                        throw AiException::unavailable($e);
+                    case ProviderException::QUOTA:
+                        Log::error("{$vendor} plan quota exhausted", ['model' => $model, 'error' => $e->getMessage()]);
 
-                throw str_contains(strtolower($e->getMessage()), 'quota') || str_contains(strtolower($e->getMessage()), 'rate')
-                    ? AiException::unavailable($e)
-                    : new AiException('The AI request was rejected. Please try again, or contact support if it keeps happening.', 502, $e);
-            } catch (TransporterException|ServerException|UnserializableResponse $e) {
-                Log::warning('OpenAI transport error', ['model' => $model, 'attempt' => $attempt, 'error' => $e->getMessage()]);
-                $lastError = AiException::unavailable($e);
+                        throw AiException::providerQuota($vendor, $e);
+                    case ProviderException::REJECTED:
+                        // Bad key, invalid schema, unknown model: retrying won't help.
+                        Log::error("{$vendor} request rejected", ['model' => $model, 'error' => $e->getMessage()]);
+
+                        throw new AiException('The AI request was rejected. Please try again, or contact support if it keeps happening.', 502, $e);
+                    default:
+                        Log::warning("{$vendor} transport error", ['model' => $model, 'attempt' => $attempt, 'error' => $e->getMessage()]);
+                        $lastError = AiException::unavailable($e);
+                }
             } catch (\RuntimeException $e) {
-                Log::warning('Unusable AI output', ['model' => $model, 'attempt' => $attempt, 'error' => $e->getMessage()]);
+                Log::warning('Unusable AI output', ['model' => $model, 'provider' => $vendor, 'attempt' => $attempt, 'error' => $e->getMessage()]);
                 $lastError = AiException::unusable($e);
             }
 
@@ -555,49 +559,27 @@ class AiWebsiteService
         throw $lastError ?? AiException::unusable();
     }
 
-    /** @return array{0: ?string, 1: ?string, 2: array} */
-    private function complete(array $params): array
+    /**
+     * Turns raw streamed text into progress events: every few chunks, describe
+     * what the model is writing right now ("Writing the pricing section…").
+     *
+     * @return callable(string): void
+     */
+    private function progressReporter(callable $onProgress, int $expectedTokens): callable
     {
-        $response = OpenAI::chat()->create($params);
-        $choice = $response->choices[0] ?? null;
-
-        return [
-            $choice?->message->content,
-            $choice?->finishReason,
-            ['input' => $response->usage?->promptTokens, 'output' => $response->usage?->completionTokens],
-        ];
-    }
-
-    /** @return array{0: string, 1: ?string, 2: array} */
-    private function stream(array $params, callable $onProgress, int $expectedTokens): array
-    {
-        $params['stream_options'] = ['include_usage' => true];
-        $stream = OpenAI::chat()->createStreamed($params);
-
         $buffer = '';
-        $finish = null;
-        $usage = ['input' => null, 'output' => null];
         $chunks = 0;
         $lastStage = null;
         $sectionsSeen = 0;
 
         $onProgress(['stage' => 'start', 'message' => 'Understanding your request…', 'progress' => 0.03]);
 
-        foreach ($stream as $response) {
-            if ($response->usage) {
-                $usage = ['input' => $response->usage->promptTokens, 'output' => $response->usage->completionTokens];
-            }
-            $choice = $response->choices[0] ?? null;
-            if (!$choice) {
-                continue;
-            }
-            $buffer .= $choice->delta->content ?? '';
-            $finish = $choice->finishReason ?? $finish;
+        return function (string $delta) use (&$buffer, &$chunks, &$lastStage, &$sectionsSeen, $onProgress, $expectedTokens): void {
+            $buffer .= $delta;
             $chunks++;
 
-            // Every few chunks, describe what the model is writing right now.
             if ($chunks % 8 !== 0) {
-                continue;
+                return;
             }
             $progress = min(0.95, 0.05 + (strlen($buffer) / 4) / $expectedTokens * 0.9);
             $event = $this->describeProgress($buffer, $sectionsSeen);
@@ -605,9 +587,7 @@ class AiWebsiteService
                 $lastStage = $event['stage'];
                 $onProgress($event + ['progress' => round($progress, 3)]);
             }
-        }
-
-        return [$buffer, $finish, $usage];
+        };
     }
 
     /** Turn the partial JSON into a human status ("Writing the pricing section…"). */

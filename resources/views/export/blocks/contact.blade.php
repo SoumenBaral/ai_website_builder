@@ -57,7 +57,7 @@
                     @endforeach
                 @endif
 
-                <button type="submit" class="px-6 py-3 text-white font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); border-radius: var(--radius);">
+                <button type="submit" class="px-6 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                     {{ $props['buttonLabel'] ?? 'Send Message' }}
                 </button>
                 <p data-contact-status class="text-sm opacity-80" role="status" hidden></p>

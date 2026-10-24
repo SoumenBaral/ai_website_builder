@@ -25,7 +25,7 @@
                 <p class="text-lg md:text-xl mb-8 opacity-90">{{ $props['subheading'] }}</p>
             @endif
             @if(!empty($props['ctaText']))
-                <a href="{{ $props['ctaHref'] ?? '#' }}" class="inline-block px-8 py-3 text-white font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); border-radius: var(--radius);">
+                <a href="{{ $props['ctaHref'] ?? '#' }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                     {{ $props['ctaText'] }}
                 </a>
             @endif
@@ -46,11 +46,11 @@
             <p class="text-lg md:text-xl mb-8 opacity-90 {{ !empty($image) ? 'text-white/80' : '' }}">{{ $props['subheading'] }}</p>
         @endif
         @if(!empty($props['ctaText']))
-            <a href="{{ $props['ctaHref'] ?? '#' }}" class="inline-block px-8 py-3 text-white font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); border-radius: var(--radius);">
+            <a href="{{ $props['ctaHref'] ?? '#' }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                 {{ $props['ctaText'] }}
             </a>
         @elseif(!empty($props['cta']['label']))
-            <a href="{{ $props['cta']['url'] ?? '#' }}" class="inline-block px-8 py-3 text-white font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); border-radius: var(--radius);">
+            <a href="{{ $props['cta']['url'] ?? '#' }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                 {{ $props['cta']['label'] }}
             </a>
         @endif

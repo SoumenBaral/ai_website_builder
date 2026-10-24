@@ -60,15 +60,15 @@ function onEditFeature(e, planIndex, featureIndex) {
                     class="p-8 border-2 hover:shadow-xl transition-all duration-300 flex flex-col"
                     :style="{
                         borderRadius: 'var(--radius)',
-                        borderColor: plan.highlighted ? 'var(--primary)' : 'transparent',
-                        background: 'var(--bg)',
+                        borderColor: plan.highlighted ? 'var(--primary)' : 'var(--line)',
+                        background: 'var(--surface)',
                         boxShadow: plan.highlighted ? '0 8px 30px rgba(0,0,0,0.12)' : '0 2px 8px rgba(0,0,0,0.06)',
                     }"
                 >
                     <div
                         v-if="plan.highlighted"
                         class="text-xs font-bold uppercase tracking-wider text-center mb-4 -mt-4 -mx-8 py-2"
-                        :style="{ background: 'var(--primary)', color: '#fff' }"
+                        :style="{ background: 'var(--primary)', color: 'var(--on-primary)' }"
                     >Most Popular</div>
                     <h3
                         class="text-xl font-semibold text-center mb-2"
@@ -108,7 +108,7 @@ function onEditFeature(e, planIndex, featureIndex) {
                         class="w-full py-3 px-6 font-semibold text-center transition-opacity hover:opacity-90"
                         :style="{
                             background: plan.highlighted ? 'var(--primary)' : 'transparent',
-                            color: plan.highlighted ? '#fff' : 'var(--primary)',
+                            color: plan.highlighted ? 'var(--on-primary)' : 'var(--primary)',
                             border: plan.highlighted ? 'none' : '2px solid var(--primary)',
                             borderRadius: 'var(--radius)',
                             fontFamily: 'var(--font-heading)',

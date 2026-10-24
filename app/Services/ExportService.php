@@ -194,14 +194,26 @@ class ExportService
             if ($hasBg) {
                 $bg = e($block['props']['sectionBg']);
                 $vars .= '--bg: ' . $bg;
-                if ($block['type'] === 'cta') $vars .= '; --primary: ' . $bg;
-                if ($block['type'] === 'footer') $vars .= '; --secondary: ' . $bg;
-                // Accents (stat numbers, prices, links) in the brand colour would vanish on a band
-                // painted that same colour — use the section's text colour there instead.
                 $primary = Color::normalize($schema['theme']['primaryColor'] ?? null);
                 $bgHex = Color::normalize($block['props']['sectionBg']);
+                $bandText = Color::normalize($block['props']['sectionText'] ?? null);
+                if ($bgHex) {
+                    // Cards and hairlines must stand off this band, not disappear into it.
+                    foreach (Color::surfaceVars($bgHex) as $name => $value) {
+                        $vars .= "; --{$name}: {$value}";
+                    }
+                }
+                if ($block['type'] === 'cta') {
+                    $vars .= '; --primary: ' . $bg;
+                    if ($bgHex) $vars .= '; --on-primary: ' . ($bandText ?? Color::readableOn($bgHex));
+                }
+                if ($block['type'] === 'footer') $vars .= '; --secondary: ' . $bg;
+                // Brand-coloured accents (prices, ticks, ribbons, buttons) would vanish on a band painted
+                // the brand colour: swap them for the band's text colour, and put the band colour on top
+                // of them so "white on primary" never becomes white on white.
                 if ($block['type'] !== 'cta' && $primary && $bgHex && Color::contrast($primary, $bgHex) < 2.5) {
-                    $vars .= '; --primary: ' . e(Color::normalize($block['props']['sectionText'] ?? null) ?? Color::readableOn($bgHex));
+                    $vars .= '; --primary: ' . e($bandText ?? Color::readableOn($bgHex));
+                    $vars .= '; --on-primary: ' . e($bgHex);
                 }
             }
             if ($hasText) {

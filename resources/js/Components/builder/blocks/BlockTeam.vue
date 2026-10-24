@@ -56,8 +56,8 @@ function onEditMember(e, index, key) {
                         />
                         <div
                             v-else
-                            class="w-full h-full flex items-center justify-center text-3xl font-bold text-white"
-                            :style="{ background: 'var(--primary)' }"
+                            class="w-full h-full flex items-center justify-center text-3xl font-bold"
+                            :style="{ background: 'var(--primary)', color: 'var(--on-primary)' }"
                         >{{ member.name?.charAt(0) }}</div>
                     </div>
                     <h3

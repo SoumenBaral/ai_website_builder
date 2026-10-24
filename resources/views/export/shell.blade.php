@@ -28,6 +28,9 @@
             --font-heading: '{{ $theme['fontHeading'] }}', sans-serif;
             --font-body: '{{ $theme['fontBody'] }}', sans-serif;
             --radius: {{ ['none' => '0', 'sm' => '0.25rem', 'md' => '0.5rem', 'lg' => '0.75rem', 'xl' => '1rem', 'full' => '9999px'][$theme['radius']] ?? '0.5rem' }};
+            {{-- Text on a --primary fill, card fills and hairlines (re-derived per coloured section). --}}
+            --on-primary: {{ \App\Services\Ai\Color::readableOn(\App\Services\Ai\Color::normalize($theme['primaryColor']) ?? '#2563eb') }};
+            @foreach(\App\Services\Ai\Color::surfaceVars(\App\Services\Ai\Color::normalize($theme['backgroundColor']) ?? '#ffffff') as $var => $value)--{{ $var }}: {{ $value }}; @endforeach
         }
         body {
             font-family: var(--font-body);

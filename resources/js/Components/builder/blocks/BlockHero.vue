@@ -66,8 +66,8 @@ const heightClass = computed(() => ({
                 >{{ subheading }}</p>
                 <a
                     :href="editable ? undefined : ctaHref"
-                    class="inline-block px-8 py-3 text-white font-medium text-lg transition-opacity hover:opacity-90"
-                    :style="{ background: 'var(--primary)', borderRadius: 'var(--radius)' }"
+                    class="inline-block px-8 py-3 font-medium text-lg transition-opacity hover:opacity-90"
+                    :style="{ background: 'var(--primary)', color: 'var(--on-primary)', borderRadius: 'var(--radius)' }"
                     :contenteditable="editable"
                     @blur="onEdit($event, 'ctaText')"
                 >{{ ctaText }}</a>
@@ -102,8 +102,8 @@ const heightClass = computed(() => ({
             >{{ subheading }}</p>
             <a
                 :href="editable ? undefined : ctaHref"
-                class="inline-block px-8 py-3 text-white font-medium text-lg transition-opacity hover:opacity-90"
-                :style="{ background: 'var(--primary)', borderRadius: 'var(--radius)' }"
+                class="inline-block px-8 py-3 font-medium text-lg transition-opacity hover:opacity-90"
+                :style="{ background: 'var(--primary)', color: 'var(--on-primary)', borderRadius: 'var(--radius)' }"
                 :contenteditable="editable"
                 @blur="onEdit($event, 'ctaText')"
             >{{ ctaText }}</a>

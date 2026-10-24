@@ -53,7 +53,7 @@
                         } elseif ($v === 'secondary') {
                             $btnStyle = 'background-color: var(--secondary); color: white; border-radius: var(--radius);';
                         } else {
-                            $btnStyle = 'background-color: var(--primary); color: white; border-radius: var(--radius);';
+                            $btnStyle = 'background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);';
                         }
                     @endphp
                     <div class="{{ $alignMap[$el['align'] ?? 'center'] ?? 'text-center' }}">

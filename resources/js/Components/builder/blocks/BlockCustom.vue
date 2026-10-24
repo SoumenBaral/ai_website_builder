@@ -32,14 +32,14 @@ function iconSize(s) { return { '2xl':'text-2xl', '3xl':'text-3xl', '4xl':'text-
 function alignClass(a) { return { left:'text-left', center:'text-center', right:'text-right' }[a] || 'text-center'; }
 function spacerHeight(h) { return { sm:'h-4', md:'h-8', lg:'h-16', xl:'h-24' }[h] || 'h-8'; }
 function btnClass(v) {
-    if (v === 'secondary') return 'inline-block px-6 py-3 font-medium transition-opacity hover:opacity-90 text-white';
+    if (v === 'secondary') return 'inline-block px-6 py-3 font-medium transition-opacity hover:opacity-90';
     if (v === 'outline') return 'inline-block px-6 py-3 font-medium border-2 transition-opacity hover:opacity-90';
-    return 'inline-block px-6 py-3 font-medium text-white transition-opacity hover:opacity-90';
+    return 'inline-block px-6 py-3 font-medium transition-opacity hover:opacity-90';
 }
 function btnStyle(v) {
-    if (v === 'secondary') return { background: 'var(--secondary)', borderRadius: 'var(--radius)' };
+    if (v === 'secondary') return { background: 'var(--secondary)', color: '#fff', borderRadius: 'var(--radius)' };
     if (v === 'outline') return { borderColor: 'var(--primary)', color: 'var(--primary)', borderRadius: 'var(--radius)' };
-    return { background: 'var(--primary)', borderRadius: 'var(--radius)' };
+    return { background: 'var(--primary)', color: 'var(--on-primary)', borderRadius: 'var(--radius)' };
 }
 
 function onEditElement(e, index, key) {

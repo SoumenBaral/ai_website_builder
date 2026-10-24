@@ -14,6 +14,7 @@ import BlockFooter from './blocks/BlockFooter.vue';
 import BlockServices from './blocks/BlockServices.vue';
 import BlockTestimonials from './blocks/BlockTestimonials.vue';
 import BlockPricing from './blocks/BlockPricing.vue';
+import { contrast, lum, mixHex, readableOn, surfaceVars } from '@/utils/color.js';
 import BlockStats from './blocks/BlockStats.vue';
 import BlockFaq from './blocks/BlockFaq.vue';
 import BlockTeam from './blocks/BlockTeam.vue';
@@ -121,30 +122,9 @@ watch(replayRequest, (r) => {
     if (textFx.value) playText();
 });
 
-/* ---------- colour helpers (mirror App\\Services\\Ai\\Color) ---------- */
+/* ---------- colour decisions (same rules as ExportService::renderSection) ---------- */
 const editorStore = useEditor();
 const primaryColor = computed(() => editorStore.schema?.theme?.primaryColor || null);
-function lum(hex) {
-    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
-    if (!m) return null;
-    const [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-function contrast(a, b) {
-    const la = lum(a);
-    const lb = lum(b);
-    if (la === null || lb === null) return 21;
-    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
-}
-const readableOn = (bg) => ((lum(bg) ?? 1) > 0.4 ? '#111111' : '#ffffff');
-
-function mixHex(a, b, amount) {
-    const pa = /^#?([0-9a-f]{6})$/i.exec(a || '');
-    const pb = /^#?([0-9a-f]{6})$/i.exec(b || '');
-    if (!pa || !pb) return a;
-    const ch = (h, i) => parseInt(h.slice(i, i + 2), 16);
-    return '#' + [0, 2, 4].map((i) => Math.round(ch(pa[1], i) + (ch(pb[1], i) - ch(pa[1], i)) * amount).toString(16).padStart(2, '0')).join('');
-}
 
 const sectionStyle = computed(() => {
     const bg = props.block.props?.sectionBg;
@@ -158,10 +138,20 @@ const sectionStyle = computed(() => {
     if (!bg && !text) return style;
     if (bg) {
         style['--bg'] = bg;
-        if (props.block.type === 'cta') style['--primary'] = bg;
+        // Cards and hairlines must stand off this band, not disappear into it.
+        Object.assign(style, surfaceVars(bg));
+        if (props.block.type === 'cta') {
+            style['--primary'] = bg;
+            style['--on-primary'] = text || readableOn(bg);
+        }
         if (props.block.type === 'footer') style['--secondary'] = bg;
-        // Same rule as the published site: brand-coloured accents must stay visible on this band.
-        if (props.block.type !== 'cta' && primaryColor.value && contrast(primaryColor.value, bg) < 2.5) style['--primary'] = text || readableOn(bg);
+        // Brand-coloured accents (prices, ticks, ribbons, buttons) would vanish on a band painted
+        // the brand colour: swap them for the band's text colour, and put the band colour on top of
+        // them so "white on primary" never becomes white on white.
+        if (props.block.type !== 'cta' && primaryColor.value && contrast(primaryColor.value, bg) < 2.5) {
+            style['--primary'] = text || readableOn(bg);
+            style['--on-primary'] = bg;
+        }
     }
     if (text) {
         style['--text'] = text;

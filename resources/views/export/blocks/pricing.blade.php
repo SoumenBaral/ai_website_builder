@@ -15,7 +15,7 @@
                 @foreach($props['plans'] as $plan)
                     <div
                         class="p-6 flex flex-col"
-                        style="border-radius: var(--radius); background-color: var(--bg);{{ !empty($plan['highlighted']) ? ' border: 2px solid var(--primary); box-shadow: 0 0 0 2px var(--primary);' : ' border: 1px solid rgba(0,0,0,0.1);' }}"
+                        style="border-radius: var(--radius); background-color: var(--surface);{{ !empty($plan['highlighted']) ? ' border: 2px solid var(--primary); box-shadow: 0 0 0 2px var(--primary);' : ' border: 1px solid var(--line);' }}"
                     >
                         <h3 class="text-xl font-semibold mb-2" style="font-family: var(--font-heading);">
                             {{ $plan['name'] ?? '' }}
@@ -42,7 +42,7 @@
                         @endif
 
                         @if(!empty($plan['ctaText']))
-                            <a href="#" class="block text-center py-2 px-4 font-semibold" style="background-color: var(--primary); color: var(--bg); border-radius: var(--radius);">
+                            <a href="#" class="block text-center py-2 px-4 font-semibold" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                                 {{ $plan['ctaText'] }}
                             </a>
                         @endif

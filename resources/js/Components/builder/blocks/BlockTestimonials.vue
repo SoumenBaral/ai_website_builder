@@ -41,8 +41,8 @@ function onEditItem(e, index, key) {
                 <div
                     v-for="(item, i) in items"
                     :key="i"
-                    class="p-8 border border-gray-200 hover:shadow-lg transition-shadow flex flex-col"
-                    :style="{ borderRadius: 'var(--radius)', background: 'var(--bg)' }"
+                    class="p-8 border hover:shadow-lg transition-shadow flex flex-col"
+                    :style="{ borderRadius: 'var(--radius)', background: 'var(--surface)', borderColor: 'var(--line)' }"
                 >
                     <div class="text-4xl mb-4 opacity-20" :style="{ color: 'var(--primary)' }">&ldquo;</div>
                     <p
@@ -60,8 +60,8 @@ function onEditItem(e, index, key) {
                         </div>
                         <div
                             v-else
-                            class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                            :style="{ background: 'var(--primary)' }"
+                            class="w-12 h-12 rounded-full flex items-center justify-center font-bold flex-shrink-0"
+                            :style="{ background: 'var(--primary)', color: 'var(--on-primary)' }"
                         >{{ item.author?.charAt(0) }}</div>
                         <div>
                             <p

@@ -18,7 +18,7 @@
             @if(!empty($props['items']))
                 @foreach($props['items'] as $i => $item)
                     @php $href = $links[$i] ?? null; @endphp
-                    <{{ $href ? 'a' : 'div' }} @if($href) href="{{ $href }}" aria-label="{{ $item['title'] ?? '' }} — view details" @endif class="group block overflow-hidden border border-gray-100 {{ $align === 'left' ? 'text-left' : 'text-center' }} {{ $href ? 'transition-shadow hover:shadow-xl' : '' }}" style="border-radius: var(--radius); background-color: var(--bg); color: inherit; text-decoration: none;">
+                    <{{ $href ? 'a' : 'div' }} @if($href) href="{{ $href }}" aria-label="{{ $item['title'] ?? '' }} — view details" @endif class="group block overflow-hidden border {{ $align === 'left' ? 'text-left' : 'text-center' }} {{ $href ? 'transition-shadow hover:shadow-xl' : '' }}" style="border-radius: var(--radius); background-color: var(--surface); border-color: var(--line); color: inherit; text-decoration: none;">
                         @if(!empty($item['image']))
                             <img src="{{ $item['image'] }}" alt="{{ $item['title'] ?? '' }}" class="w-full h-40 object-cover">
                         @endif

@@ -54,8 +54,8 @@ function onEditItem(e, index, key) {
                 <div
                     v-for="(item, i) in items"
                     :key="i"
-                    class="border border-gray-200 hover:shadow-xl transition-all duration-300 group overflow-hidden"
-                    :style="{ borderRadius: 'var(--radius)', background: 'var(--bg)' }"
+                    class="border hover:shadow-xl transition-all duration-300 group overflow-hidden"
+                    :style="{ borderRadius: 'var(--radius)', background: 'var(--surface)', borderColor: 'var(--line)' }"
                 >
                     <img v-if="item.image" :src="item.image" :alt="item.title" class="w-full h-40 object-cover" />
                     <div class="p-8">

@@ -60,8 +60,8 @@ function onEdit(e, key) {
 
                 <a
                     :href="editable ? undefined : ctaHref"
-                    class="px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                    :style="{ background: 'var(--primary)', borderRadius: 'var(--radius)' }"
+                    class="px-5 py-2 text-sm font-semibold transition-opacity hover:opacity-90"
+                    :style="{ background: 'var(--primary)', color: 'var(--on-primary)', borderRadius: 'var(--radius)' }"
                     :contenteditable="editable"
                     @blur="onEdit($event, 'ctaText')"
                 >{{ ctaText }}</a>
@@ -94,7 +94,7 @@ function onEdit(e, key) {
             <div
                 v-if="mobileOpen"
                 class="md:hidden border-t px-6 py-4 shadow-inner"
-                :style="{ background: 'var(--bg)', borderColor: 'rgba(0,0,0,0.06)' }"
+                :style="{ background: 'var(--bg)', borderColor: 'var(--line)' }"
             >
                 <div class="flex flex-col gap-3">
                     <a
@@ -108,8 +108,8 @@ function onEdit(e, key) {
 
                     <a
                         :href="editable ? undefined : ctaHref"
-                        class="mt-1 block text-center px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                        :style="{ background: 'var(--primary)', borderRadius: 'var(--radius)' }"
+                        class="mt-1 block text-center px-5 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
+                        :style="{ background: 'var(--primary)', color: 'var(--on-primary)', borderRadius: 'var(--radius)' }"
                         @click="mobileOpen = false"
                     >{{ ctaText }}</a>
                 </div>

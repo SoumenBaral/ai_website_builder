@@ -25,6 +25,12 @@ class AiException extends RuntimeException
         return new self('The AI returned an incomplete result. Please try again — rephrasing the request can help.', 502, $previous);
     }
 
+    /** The provider's own plan/credits are exhausted — an operator problem, not a user one. */
+    public static function providerQuota(string $provider, ?\Throwable $previous = null): self
+    {
+        return new self("The {$provider} account behind this site has used up its plan quota. Please check the {$provider} subscription, or switch AI provider, then try again.", 503, $previous);
+    }
+
     public static function unavailable(?\Throwable $previous = null): self
     {
         return new self('The AI service is busy or unreachable right now. Please try again in a moment.', 503, $previous);

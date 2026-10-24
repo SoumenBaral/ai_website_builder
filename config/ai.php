@@ -10,11 +10,38 @@
 
 return [
 
-    'models' => [
-        // Full-site generation: quality matters most.
-        'generate' => env('AI_GENERATE_MODEL', 'gpt-4.1'),
-        // Edits (full site or one section): fast and cheap, structure is enforced by the schema.
-        'edit' => env('AI_EDIT_MODEL', 'gpt-4.1-mini'),
+    /*
+    | Which backend answers AI requests.
+    |   auto   — decided by the API key: a `pk_live_…` key means Puku (puku.sh),
+    |            an `sk-…` key means OpenAI. AI_API_KEY wins, then OPENAI_API_KEY / PUKU_API_KEY.
+    |   openai — always OpenAI.
+    |   puku   — always Puku.
+    */
+    'provider' => env('AI_PROVIDER', 'auto'),
+
+    // One key to rule them all: paste either vendor's key here and `auto` works it out.
+    'api_key' => env('AI_API_KEY'),
+
+    'providers' => [
+        'openai' => [
+            'api_key' => env('OPENAI_API_KEY'),
+            'models' => [
+                // Full-site generation: quality matters most.
+                'generate' => env('AI_GENERATE_MODEL', 'gpt-4.1'),
+                // Edits (full site or one section): fast and cheap, structure is enforced by the schema.
+                'edit' => env('AI_EDIT_MODEL', 'gpt-4.1-mini'),
+            ],
+        ],
+        'puku' => [
+            'api_key' => env('PUKU_API_KEY'),
+            // Anthropic-Messages-compatible gateway used by the Puku CLI / agent SDK.
+            'base_url' => env('PUKU_BASE_URL', 'https://api-cli.puku.sh'),
+            'models' => [
+                // `opus` is Puku's alias for the latest Claude Opus; puku-ai-2.8 / 2.7 are its own tiers.
+                'generate' => env('PUKU_GENERATE_MODEL', 'opus'),
+                'edit' => env('PUKU_EDIT_MODEL', 'puku-ai-2.8'),
+            ],
+        ],
     ],
 
     'temperature' => [
@@ -42,6 +69,11 @@ return [
         'gpt-4.1-nano' => [0.10, 0.40],
         'gpt-4o' => [2.50, 10.00],
         'gpt-4o-mini' => [0.15, 0.60],
+        // Puku bills per request against a subscription bucket, not per token; these are
+        // list-price estimates for the underlying models so the cost column stays meaningful.
+        'opus' => [5.00, 25.00],
+        'puku-ai-2.8' => [3.00, 15.00],
+        'puku-ai-2.7' => [3.00, 15.00],
     ],
 
     // Optional: real photo search. Without a key, a curated, verified library is used.

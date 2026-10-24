@@ -17,7 +17,7 @@ function onEdit(e, key) {
 </script>
 
 <template>
-    <section class="relative py-20 px-6 text-white overflow-hidden" :class="align === 'left' ? 'text-left' : 'text-center'" :style="{ background: 'var(--primary)' }">
+    <section class="relative py-20 px-6 overflow-hidden" :class="align === 'left' ? 'text-left' : 'text-center'" :style="{ background: 'var(--primary)', color: 'var(--on-primary)' }">
         <!-- Background image if provided -->
         <template v-if="image">
             <div class="absolute inset-0 bg-cover bg-center" :style="{ backgroundImage: `url(${image})` }"></div>
@@ -39,8 +39,8 @@ function onEdit(e, key) {
             >{{ subheading }}</p>
             <a
                 :href="editable ? undefined : ctaHref"
-                class="inline-block px-8 py-3 bg-white font-medium text-lg transition-opacity hover:opacity-90"
-                :style="{ color: 'var(--primary)', borderRadius: 'var(--radius)' }"
+                class="inline-block px-8 py-3 font-medium text-lg transition-opacity hover:opacity-90"
+                :style="{ background: 'var(--on-primary)', color: 'var(--primary)', borderRadius: 'var(--radius)' }"
                 :contenteditable="editable"
                 @blur="onEdit($event, 'ctaText')"
             >{{ ctaText }}</a>
