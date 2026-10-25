@@ -8,12 +8,12 @@
                 </h2>
             @endif
             @if(!empty($props['body']))
-                <div class="leading-relaxed opacity-90">{!! $props['body'] !!}</div>
+                <div class="leading-relaxed opacity-90 space-y-4">{!! \App\Support\SiteHtml::paragraphs($props['body']) !!}</div>
             @endif
         </div>
         <div class="{{ $imgPos === 'left' ? 'md:order-1' : '' }}">
             @if(!empty($props['image']))
-                <img src="{{ $props['image'] }}" alt="{{ $props['heading'] ?? 'About' }}" class="w-full object-cover shadow-lg" style="border-radius: var(--radius);">
+                <img {!! \App\Support\SiteHtml::img($props['image'], '(min-width: 768px) 50vw, 100vw') !!} alt="{{ $props['heading'] ?? 'About' }}" width="1200" height="900" class="w-full h-auto object-cover shadow-lg" style="border-radius: var(--radius); aspect-ratio: 4 / 3;">
             @endif
         </div>
     </div>

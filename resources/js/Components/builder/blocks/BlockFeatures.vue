@@ -37,7 +37,7 @@ const gridClass = computed(() => ({
     <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
         <div class="max-w-6xl mx-auto">
             <!-- Header image -->
-            <img v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-10" :class="imageClasses" />
+            <img loading="lazy" decoding="async" v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-10" :class="imageClasses" />
 
             <h2
                 class="text-3xl md:text-4xl font-bold mb-12"
@@ -55,7 +55,7 @@ const gridClass = computed(() => ({
                     :style="{ borderRadius: 'var(--radius)' }"
                 >
                     <!-- Item image -->
-                    <img v-if="item.image" :src="item.image" :alt="item.title" class="w-full h-40 object-cover" />
+                    <img loading="lazy" decoding="async" v-if="item.image" :src="item.image" :alt="item.title" class="w-full h-40 object-cover" />
                     <div class="p-6">
                         <div v-if="item.icon" class="text-4xl mb-4">{{ item.icon }}</div>
                         <h3

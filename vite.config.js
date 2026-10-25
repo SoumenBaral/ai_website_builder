@@ -17,4 +17,18 @@ export default defineConfig({
             },
         }),
     ],
+    build: {
+        rollupOptions: {
+            output: {
+                // Framework code changes rarely: keep it in its own long-cached chunk.
+                manualChunks(id) {
+                    if (/node_modules\/(vue|@vue|@inertiajs|pinia|axios)\//.test(id)) return 'vendor';
+                },
+            },
+        },
+    },
+    test: {
+        environment: 'node',
+        include: ['resources/js/**/*.test.js'],
+    },
 });

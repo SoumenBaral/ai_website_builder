@@ -20,18 +20,18 @@
         <div class="hidden md:flex items-center gap-6">
             @if(!empty($props['links']))
                 @foreach($props['links'] as $link)
-                    <a href="{{ $link['href'] ?? $link['url'] ?? '#' }}" class="text-sm hover:opacity-80 transition-opacity" style="color: var(--text);">
+                    <a href="{{ \App\Support\SiteHtml::href($link['href'] ?? $link['url'] ?? '#') }}" class="text-sm hover:opacity-80 transition-opacity" style="color: var(--text);">
                         {{ $link['label'] ?? '' }}
                     </a>
                 @endforeach
             @endif
 
             @if(!empty($props['ctaText']))
-                <a href="{{ $props['ctaHref'] ?? '#' }}" class="px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90" style="background-color: var(--primary); border-radius: var(--radius);">
+                <a href="{{ \App\Support\SiteHtml::href($props['ctaHref'] ?? '#') }}" class="px-5 py-2 text-sm font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                     {{ $props['ctaText'] }}
                 </a>
             @elseif(!empty($props['cta']['label']))
-                <a href="{{ $props['cta']['url'] ?? '#' }}" class="px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90" style="background-color: var(--primary); border-radius: var(--radius);">
+                <a href="{{ \App\Support\SiteHtml::href($props['cta']['url'] ?? '#') }}" class="px-5 py-2 text-sm font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                     {{ $props['cta']['label'] }}
                 </a>
             @endif
@@ -54,22 +54,22 @@
     </div>
 
     <!-- Mobile menu -->
-    <div id="mobile-menu" class="hidden md:hidden border-t px-6 py-4" style="background-color: var(--bg); border-color: rgba(0,0,0,0.06);">
+    <div id="mobile-menu" class="hidden md:hidden border-t px-6 py-4" style="background-color: var(--bg); border-color: var(--line);">
         <div class="flex flex-col gap-3">
             @if(!empty($props['links']))
                 @foreach($props['links'] as $link)
-                    <a href="{{ $link['href'] ?? $link['url'] ?? '#' }}" class="text-sm py-2 hover:opacity-80 transition-opacity" style="color: var(--text);">
+                    <a href="{{ \App\Support\SiteHtml::href($link['href'] ?? $link['url'] ?? '#') }}" class="text-sm py-2 hover:opacity-80 transition-opacity" style="color: var(--text);">
                         {{ $link['label'] ?? '' }}
                     </a>
                 @endforeach
             @endif
 
             @if(!empty($props['ctaText']))
-                <a href="{{ $props['ctaHref'] ?? '#' }}" class="mt-1 block text-center px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90" style="background-color: var(--primary); border-radius: var(--radius);">
+                <a href="{{ \App\Support\SiteHtml::href($props['ctaHref'] ?? '#') }}" class="mt-1 block text-center px-5 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                     {{ $props['ctaText'] }}
                 </a>
             @elseif(!empty($props['cta']['label']))
-                <a href="{{ $props['cta']['url'] ?? '#' }}" class="mt-1 block text-center px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90" style="background-color: var(--primary); border-radius: var(--radius);">
+                <a href="{{ \App\Support\SiteHtml::href($props['cta']['url'] ?? '#') }}" class="mt-1 block text-center px-5 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                     {{ $props['cta']['label'] }}
                 </a>
             @endif

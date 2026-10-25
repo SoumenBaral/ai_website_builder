@@ -59,11 +59,11 @@ it('publishes animated sections with the animation script', function () {
         ['id' => 'c', 'type' => 'cta', 'props' => ['heading' => 'Go', 'animation' => 'none']],
     ]));
 
-    expect($html)->toContain('data-anim="zoom" data-anim-speed="slow"')
+    expect(with_site_assets($html))->toContain('data-anim="zoom" data-anim-speed="slow"')
         ->toContain('data-anim="fade-up" data-anim-stagger')
         ->toContain('IntersectionObserver')
         ->toContain('prefers-reduced-motion')
-        ->toContain(".anim-on [data-anim] [data-at='0']")
+        ->toContain('.anim-on [data-anim] [data-at="0"]')  // minified: attribute quotes normalised
         ->and(substr_count($html, '<div data-anim="'))->toBe(2); // "none" isn't wrapped
 });
 
@@ -98,11 +98,11 @@ it('publishes hover effects, whole-navbar motion and legacy names', function () 
         ['id' => 'f', 'type' => 'features', 'props' => ['heading' => 'F', 'items' => [['title' => 'A', 'description' => 'B']], 'hoverEffect' => 'lift']],
     ]));
 
-    expect($html)->toContain('<div data-anim="fade-down" data-anim-whole>')
+    expect(with_site_assets($html))->toContain('<div data-anim="fade-down" data-anim-whole>')
         ->toContain('<div data-anim="from-left">')
         ->toContain('<div data-hover="lift">')       // hover works without an entrance animation
         ->toContain('window.SiteAnim')               // the same runtime the editor uses
-        ->toContain('[data-hover=\'lift\']');
+        ->toContain('[data-hover=lift]');            // minified selector
 });
 
 it('applies animation-only AI edits without touching content', function () {

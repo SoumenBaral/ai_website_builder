@@ -5,7 +5,9 @@
     "scripts": {
         "build": "vite build && npm run build:site",
         "dev": "vite",
-        "build:site": "tailwindcss -c tailwind.site.config.js -i resources/css/site-tailwind.css -o public/site/site.css --minify"
+        "build:site": "tailwindcss -c tailwind.site.config.js -i resources/css/site-tailwind.css -o public/site/site.css --minify && npm run build:site-runtime",
+        "build:site-runtime": "esbuild resources/js/site/animRuntime.js --minify --outfile=public/site/anim.js && esbuild resources/js/site/cartRuntime.js --minify --outfile=public/site/cart.js && esbuild resources/css/site-animations.css --minify --outfile=public/site/anim.css && esbuild resources/css/site-shop.css --minify --outfile=public/site/shop.css",
+        "test": "vitest run"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^2.0.0",
@@ -14,10 +16,12 @@
         "@vitejs/plugin-vue": "^6.0.0",
         "autoprefixer": "^10.4.12",
         "concurrently": "^9.0.1",
+        "esbuild": "^0.28.2",
         "laravel-vite-plugin": "^3.1",
         "postcss": "^8.4.31",
         "tailwindcss": "^3.2.1",
         "vite": "^8.0.0",
+        "vitest": "^5.0.5",
         "vue": "^3.4.0"
     },
     "dependencies": {

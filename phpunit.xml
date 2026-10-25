@@ -29,6 +29,13 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <!-- Tests never talk to a real AI or photo API, whatever .env says. -->
+        <env name="AI_PROVIDER" value="openai"/>
+        <env name="AI_API_KEY" value=""/>
+        <env name="OPENAI_API_KEY" value="sk-test-not-a-real-key"/>
+        <env name="PUKU_API_KEY" value=""/>
+        <env name="PEXELS_API_KEY" value=""/>
+        <env name="UNSPLASH_ACCESS_KEY" value=""/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

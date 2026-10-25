@@ -94,8 +94,8 @@ const fieldLabels = {
                     </div>
                     <button
                         type="submit"
-                        class="w-full px-6 py-3 text-white font-medium transition-opacity hover:opacity-90"
-                        :style="{ background: 'var(--primary)', borderRadius: 'var(--radius)' }"
+                        class="w-full px-6 py-3 font-medium transition-opacity hover:opacity-90"
+                        :style="{ background: 'var(--primary)', color: 'var(--on-primary)', borderRadius: 'var(--radius)' }"
                     >Send Message</button>
                 </form>
             </div>

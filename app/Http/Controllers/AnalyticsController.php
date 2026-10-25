@@ -15,8 +15,8 @@ class AnalyticsController extends Controller
         $request->validate([
             'project_id' => 'required|exists:projects,id',
             'event' => 'required|string|in:pageview,click',
-            'path' => 'nullable|string|max:500',
-            'referrer' => 'nullable|string|max:500',
+            'path' => 'nullable|string|max:255',
+            'referrer' => 'nullable|string|max:255',
             'device' => 'nullable|string|max:50',
         ]);
 

@@ -1,7 +1,7 @@
 <script setup>
 import '../../css/landing.css';
 import '../../css/editor.css';
-import { ref, computed, provide, nextTick, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, provide, nextTick, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import { watchDebounced } from '@vueuse/core';
 import axios from 'axios';
@@ -11,10 +11,11 @@ import BlockRenderer from '@/Components/builder/BlockRenderer.vue';
 import PromptBar from '@/Components/builder/PromptBar.vue';
 import BlockTree from '@/Components/builder/BlockTree.vue';
 import Inspector from '@/Components/builder/Inspector.vue';
-import ThemePanel from '@/Components/builder/ThemePanel.vue';
-import VersionHistory from '@/Components/builder/VersionHistory.vue';
 import EditorToasts from '@/Components/builder/EditorToasts.vue';
-import LogoStudio from '@/Components/builder/LogoStudio.vue';
+// Opened rarely: fetched on first use instead of shipping with the editor bundle.
+const ThemePanel = defineAsyncComponent(() => import('@/Components/builder/ThemePanel.vue'));
+const VersionHistory = defineAsyncComponent(() => import('@/Components/builder/VersionHistory.vue'));
+const LogoStudio = defineAsyncComponent(() => import('@/Components/builder/LogoStudio.vue'));
 import { useToast } from '@/Components/builder/useToast';
 import { useFavicon } from '@/Components/builder/useFavicon';
 import Icon from '@/Components/Landing/Icon.vue';
@@ -83,24 +84,62 @@ watch(navbarLogo, (url) => {
     }, 700);
 });
 
-async function saveNow() {
-    if (!editor.dirty) return;
+/*
+ * Saves run one at a time and carry the revision they captured: edits made while a save is
+ * in flight keep the page dirty (and trigger the next save) instead of being marked clean.
+ * A failed save retries by itself; the page warns before closing with unsaved work.
+ */
+let saveChain = Promise.resolve();
+let retryTimer = 0;
+function saveNow() {
+    saveChain = saveChain.then(() => performSave()).catch(() => {});
+    return saveChain;
+}
+async function performSave(attempt = 1) {
+    if (!editor.dirty || editor.locked) return;
+    clearTimeout(retryTimer);
+    const revision = editor.revision;
     editor.saving = true;
     try {
         await axios.post(route('pages.autosave', { project: props.project.id, page: props.page.id }), {
             schema: editor.schema,
-        });
-        editor.markClean();
+        }, { timeout: 20000 });
+        editor.markClean(revision);
+        if (editor.dirty) queueMicrotask(saveNow); // something changed while saving
     } catch (e) {
-        notify('Autosave failed — check your connection.', 'error');
-    } finally {
         editor.saving = false;
+        if (e.response?.status === 422) {
+            notify(e.response.data?.message || 'That change could not be saved.', 'error');
+            return;
+        }
+        if (attempt < 4) {
+            retryTimer = setTimeout(() => { saveChain = saveChain.then(() => performSave(attempt + 1)).catch(() => {}); }, 2000 * attempt);
+            if (attempt === 1) notify('Autosave failed — retrying…', 'error');
+        } else {
+            notify('Still can\'t save — check your connection. Your changes stay here until it works.', 'error', { duration: 8000 });
+        }
     }
 }
 // Previews (e.g. a card's details page) save first so they always show the latest edits.
 provide('saveNow', saveNow);
 
-watchDebounced(() => editor.schema, saveNow, { debounce: 1200, deep: true });
+// The revision counter changes on every edit — far cheaper than deep-watching the whole schema.
+watchDebounced(() => editor.revision, saveNow, { debounce: 1200, maxWait: 6000 });
+
+// Leaving with unsaved work: the browser asks first (tab close, reload, Inertia navigation).
+function guardUnload(e) {
+    if (!editor.dirty && !editor.saving) return;
+    e.preventDefault();
+    e.returnValue = '';
+}
+onMounted(() => window.addEventListener('beforeunload', guardUnload));
+onUnmounted(() => window.removeEventListener('beforeunload', guardUnload));
+const removeNavGuard = router.on('before', (event) => {
+    if ((editor.dirty || editor.saving) && !String(event.detail.visit.url).includes(`/projects/${props.project.id}/`)) {
+        if (!window.confirm('You have unsaved changes. Leave anyway?')) return false;
+    }
+});
+onUnmounted(removeNavGuard);
 
 const saveState = computed(() => (editor.saving ? 'saving' : editor.dirty ? 'unsaved' : 'saved'));
 
@@ -167,6 +206,12 @@ function handleKeydown(e) {
     } else if (mod && e.key.toLowerCase() === 'z' && e.shiftKey && !isTyping(e.target)) {
         e.preventDefault();
         editor.redo();
+    } else if (mod && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveNow();
+    } else if (mod && e.key.toLowerCase() === 'y' && !isTyping(e.target)) {
+        e.preventDefault();
+        editor.redo();
     } else if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         promptBar.value?.focus();
@@ -188,9 +233,8 @@ const themeVars = computed(() => {
 });
 const fontLink = computed(() => {
     if (!editor.schema?.theme) return '';
-    const h = editor.schema.theme.fontHeading;
-    const b = editor.schema.theme.fontBody;
-    return `https://fonts.googleapis.com/css2?family=${h}:wght@400;600;700&family=${b}:wght@400;500;600&display=swap`;
+    const families = [...new Set([editor.schema.theme.fontHeading, editor.schema.theme.fontBody].filter(Boolean))];
+    return `https://fonts.googleapis.com/css2?${families.map((f) => `family=${encodeURIComponent(f)}:wght@400;500;600;700`).join('&')}&display=swap`;
 });
 </script>
 
@@ -319,7 +363,7 @@ const fontLink = computed(() => {
                                 v-for="block in editor.schema.sections"
                                 :key="block.id"
                                 :block="block"
-                                :editable="true"
+                                :editable="!editor.locked"
                                 :selected="editor.selectedId === block.id"
                                 @select="editor.select"
                                 @update:props="onUpdateProps"

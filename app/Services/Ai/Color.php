@@ -82,4 +82,21 @@ final class Color
 
         return $color;
     }
+
+    /**
+     * Derived variables every block relies on, for a given background:
+     * surface = card/panel fill that stands off it, line = visible hairline borders.
+     * Mirrors surfaceVars() in resources/js/utils/color.js.
+     *
+     * @return array{surface: string, line: string}
+     */
+    public static function surfaceVars(string $background): array
+    {
+        $dark = self::isDark($background);
+
+        return [
+            'surface' => self::mix($background, $dark ? '#ffffff' : '#000000', $dark ? 0.10 : 0.04),
+            'line' => self::mix($background, self::readableOn($background), 0.16),
+        ];
+    }
 }

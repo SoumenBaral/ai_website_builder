@@ -41,7 +41,7 @@
 
                 @elseif($elType === 'icon')
                     <div class="{{ $iconSizes[$el['size'] ?? '4xl'] ?? 'text-4xl' }} {{ $alignMap[$el['align'] ?? 'center'] ?? 'text-center' }}">
-                        {!! $el['emoji'] ?? '' !!}
+                        {{ $el['emoji'] ?? '' }}
                     </div>
 
                 @elseif($elType === 'button')
@@ -53,11 +53,11 @@
                         } elseif ($v === 'secondary') {
                             $btnStyle = 'background-color: var(--secondary); color: white; border-radius: var(--radius);';
                         } else {
-                            $btnStyle = 'background-color: var(--primary); color: white; border-radius: var(--radius);';
+                            $btnStyle = 'background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);';
                         }
                     @endphp
                     <div class="{{ $alignMap[$el['align'] ?? 'center'] ?? 'text-center' }}">
-                        <a href="{{ $el['href'] ?? '#' }}" class="{{ $btnClass }}" style="{{ $btnStyle }}">{{ $el['text'] ?? 'Button' }}</a>
+                        <a href="{{ \App\Support\SiteHtml::href($el['href'] ?? '#') }}" class="{{ $btnClass }}" style="{{ $btnStyle }}">{{ $el['text'] ?? 'Button' }}</a>
                     </div>
 
                 @elseif($elType === 'divider')

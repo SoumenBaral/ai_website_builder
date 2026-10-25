@@ -13,7 +13,7 @@
         <div class="grid {{ $gridClass }} gap-8">
             @if(!empty($props['items']))
                 @foreach($props['items'] as $item)
-                    <div class="p-6" style="border-radius: var(--radius); background-color: var(--bg); border: 1px solid rgba(0,0,0,0.1);">
+                    <div class="p-6" style="border-radius: var(--radius); background-color: var(--surface); border: 1px solid var(--line);">
                         <p class="italic text-lg mb-4 opacity-90">
                             "{{ $item['quote'] ?? '' }}"
                         </p>

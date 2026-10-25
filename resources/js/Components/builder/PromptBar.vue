@@ -128,18 +128,25 @@ async function submit() {
         } else if (mode.value === 'section' && selectedBlock.value) {
             // Edit the selected section only (short request, plain JSON)
             startStatusCycle(editStatusMessages);
+            const targetId = selectedBlock.value.id; // the user may select another section meanwhile
             const { data } = await axios.post(route('ai.editSection'), {
                 section: selectedBlock.value,
                 theme: editor.schema.theme,
                 instruction: prompt.value,
             });
-            editor.updateSection(selectedBlock.value.id, data.section);
-            const motion = wantsMotion ? await aiAnimate(editor, prompt.value, selectedBlock.value.id, { extract: true }).catch(() => null) : null;
+            if (!editor.updateSection(targetId, data.section)) throw new Error('That section was removed before the AI finished.');
+            const motion = wantsMotion ? await aiAnimate(editor, prompt.value, targetId, { extract: true }).catch(() => null) : null;
             notify([data.summary || 'Section updated.', motion?.summary].filter(Boolean).join(' '), 'success', { duration: 6000 });
         } else {
             // Edit the full site — streamed
             statusText.value = editStatusMessages[0];
-            const data = await streamAi(route('ai.edit'), { schema: editor.schema, instruction: prompt.value }, onProgress);
+            editor.locked = true; // the whole site is being rewritten: edits typed now would be lost
+            let data;
+            try {
+                data = await streamAi(route('ai.edit'), { schema: editor.schema, instruction: prompt.value }, onProgress);
+            } finally {
+                editor.locked = false;
+            }
             editor.setSchema(data.schema);
             const motion = wantsMotion ? await aiAnimate(editor, prompt.value, null, { extract: true }).catch(() => null) : null;
             notify([data.summary || 'Site updated.', motion?.summary].filter(Boolean).join(' '), 'success', { duration: 6000 });

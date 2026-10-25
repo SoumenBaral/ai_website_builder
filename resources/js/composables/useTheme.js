@@ -1,3 +1,5 @@
+import { readableOn, surfaceVars } from '@/utils/color.js';
+
 const radiusMap = {
     none: '0',
     sm: '0.25rem',
@@ -16,6 +18,10 @@ export function themeToVars(theme) {
         '--font-heading': theme.fontHeading,
         '--font-body': theme.fontBody,
         '--radius': radiusMap[theme.radius] || '0.5rem',
+        // Text that sits on a --primary fill (buttons, ribbons, avatars).
+        '--on-primary': readableOn(theme.primaryColor),
+        // Card fills and hairlines that stand off the page background.
+        ...surfaceVars(theme.backgroundColor),
     };
 }
 

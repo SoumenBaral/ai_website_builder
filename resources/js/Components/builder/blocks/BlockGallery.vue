@@ -36,7 +36,7 @@ const gridClass = {
                     class="group relative overflow-hidden"
                     :style="{ borderRadius: 'var(--radius)' }"
                 >
-                    <img
+                    <img loading="lazy" decoding="async"
                         :src="img.src"
                         :alt="img.caption"
                         class="w-full h-64 object-cover transition-transform duration-300 group-hover:scale-105"

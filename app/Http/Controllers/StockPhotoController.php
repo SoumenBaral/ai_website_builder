@@ -3,14 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Services\Ai\ImageLibrary;
+use App\Services\Photos\PhotoCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * "Free photos" in the editor's image picker: the built-in library (hand-checked photos),
- * plus a live Unsplash search when UNSPLASH_ACCESS_KEY is set.
+ * "Free photos" in the editor's image picker: the stock catalog (2,000+ photos described
+ * by a vision model) when it has been imported, the built-in hand-checked library, plus a
+ * live Unsplash search when UNSPLASH_ACCESS_KEY is set.
  */
 class StockPhotoController extends Controller
 {
@@ -34,7 +36,7 @@ class StockPhotoController extends Controller
         'people' => ['label' => 'People', 'tags' => []], // portraits
     ];
 
-    public function index(Request $request)
+    public function index(Request $request, PhotoCatalog $catalog)
     {
         $data = $request->validate([
             'q' => 'nullable|string|max:80',
@@ -43,15 +45,39 @@ class StockPhotoController extends Controller
         $query = trim(mb_strtolower($data['q'] ?? ''));
         $category = $data['category'] ?? null;
 
-        $photos = $this->library($query, $category);
+        // With a real catalog the small built-in library adds nothing (and would pollute category browsing).
+        $fromCatalog = $catalog->ready() ? $this->catalog($catalog, $query, $category) : [];
+        $photos = $catalog->ready() ? [] : $this->library($query, $category);
         $unsplash = $query !== '' ? $this->unsplash($query) : [];
 
+        $categories = collect(self::CATEGORIES)->map(fn ($c, $key) => ['key' => $key, 'label' => $c['label']]);
+        if ($catalog->ready()) {
+            // Categories the catalog actually has, keeping known labels and adding new ones.
+            $categories = collect($catalog->categories())->map(fn ($n, $key) => ['key' => $key, 'label' => self::CATEGORIES[$key]['label'] ?? ucfirst($key), 'count' => $n]);
+        }
+
         return response()->json([
-            'categories' => collect(self::CATEGORIES)->map(fn ($c, $key) => ['key' => $key, 'label' => $c['label']])->values(),
-            // Live results first (more variety), then the curated library; no duplicates.
-            'photos' => collect($unsplash)->concat($photos)->unique('id')->take(60)->values(),
+            'categories' => $categories->values(),
+            // Catalog first (vision-described, most relevant), then live results, then the small library.
+            'photos' => collect($fromCatalog)->concat($unsplash)->concat($photos)->unique('id')->take(60)->values(),
             'live' => (bool) config('ai.unsplash_access_key'),
+            'catalog' => $catalog->count(),
         ]);
+    }
+
+    private function catalog(PhotoCatalog $catalog, string $query, ?string $category): array
+    {
+        $rows = $query !== ''
+            ? array_column($catalog->search($query, '', 'card', [], 60, $category), 'photo')
+            : $catalog->browse($category, 60);
+
+        return array_map(fn ($p) => [
+            'id' => $p['key'],
+            'url' => $catalog->url($p, 'wide'),
+            'thumb' => $catalog->thumb($p),
+            'label' => $p['label'],
+            'credit' => $p['credit'],
+        ], $rows);
     }
 
     private function library(string $query, ?string $category): array

@@ -39,7 +39,7 @@ function onEdit(e, key) {
                 >{{ body }}</p>
             </div>
             <div v-if="image" :class="imagePosition === 'left' ? 'md:order-1' : ''">
-                <img
+                <img loading="lazy" decoding="async"
                     :src="image"
                     :alt="heading"
                     class="w-full h-80 object-cover"

@@ -14,7 +14,7 @@
             @if(!empty($props['members']))
                 @foreach($props['members'] as $i => $member)
                     @php $href = $links[$i] ?? null; @endphp
-                    <{{ $href ? 'a' : 'div' }} @if($href) href="{{ $href }}" aria-label="{{ $member['name'] ?? '' }} — view profile" @endif class="group block text-center" style="color: inherit; text-decoration: none;">
+                    <{{ $href ? 'a' : 'div' }} @if($href) href="{{ \App\Support\SiteHtml::href($href) }}" aria-label="{{ $member['name'] ?? '' }} — view profile" @endif class="group block text-center" style="color: inherit; text-decoration: none;">
                         @if(!empty($member['image']))
                             <img
                                 src="{{ $member['image'] }}"

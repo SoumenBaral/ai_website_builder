@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Services\Ai\ImageLibrary;
+use App\Services\Ai\Providers\ChatProvider;
+use App\Services\Ai\Providers\ChatRequest;
+use App\Services\Photos\PhotoCatalog;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -10,13 +13,23 @@ use Illuminate\Support\Facades\Log;
 /**
  * Turns the AI's "PLACEHOLDER:<search query>" values into real photo URLs.
  *
- * - With UNSPLASH_ACCESS_KEY set: searches Unsplash (cached) for the query.
- * - Otherwise: scores a curated, verified photo library against the query.
+ * In order of preference:
+ * 1. The stock photo catalog (2,000+ photos described by a vision model, see
+ *    `photos:import` / `photos:analyze`), with an AI rerank for the hero photo.
+ * 2. With UNSPLASH_ACCESS_KEY set: a live Unsplash search (cached).
+ * 3. The small hand-curated ImageLibrary.
  * Photos are never repeated within one site, and each placement gets a
  * suitable size/crop (wide hero backgrounds, cards, square portraits).
  */
 class ImageResolver
 {
+    public function __construct(
+        private ?PhotoCatalog $catalog = null,
+        private ?ChatProvider $provider = null,
+    ) {
+        $this->catalog ??= app(PhotoCatalog::class);
+    }
+
     private const PREFIX = 'PLACEHOLDER:';
 
     /** Image props whose photo fills a whole section (wide crop). */
@@ -44,8 +57,8 @@ class ImageResolver
 
         // Existing photos count as used, so new ones don't duplicate them.
         array_walk_recursive($schema, function ($value) {
-            if (is_string($value) && preg_match('#images\.unsplash\.com/photo-([\w-]+)#', $value, $m)) {
-                $this->used[$m[1]] = true;
+            if (is_string($value)) {
+                $this->markUsed($value);
             }
         });
 
@@ -71,8 +84,8 @@ class ImageResolver
         $this->used = [];
         $this->siteHint = strtolower($siteHint);
         foreach ($exclude as $url) {
-            if (is_string($url) && preg_match('#images\.unsplash\.com/photo-([\w-]+)#', $url, $m)) {
-                $this->used[$m[1]] = true;
+            if (is_string($url)) {
+                $this->markUsed($url);
             }
         }
 
@@ -92,7 +105,9 @@ class ImageResolver
         foreach ($section['props'] as $key => $value) {
             if (is_string($value) && $this->isPlaceholder($value)) {
                 $placement = in_array($type, self::WIDE_SECTIONS, true) ? 'wide' : 'card';
+                $this->rerankNext = in_array($type, ['hero', 'about'], true);
                 $url = $this->resolve($this->query($value), $placement, optional: !in_array($type, self::REQUIRED_SECTION_IMAGES, true));
+                $this->rerankNext = false;
                 if ($url === null) {
                     unset($section['props'][$key]); // no relevant photo: better none than an unrelated one
                 } else {
@@ -134,9 +149,28 @@ class ImageResolver
         return strtolower(trim(substr($value, strlen(self::PREFIX))));
     }
 
+    private bool $rerankNext = false;
+
+    private function markUsed(string $url): void
+    {
+        if (preg_match('#images\.unsplash\.com/photo-([\w-]+)#', $url, $m)) {
+            $this->used[$m[1]] = true;
+        } elseif ($key = PhotoCatalog::keyFromUrl($url)) {
+            $this->used[$key] = true;
+        }
+    }
+
     /** @param bool $optional Return null instead of an unrelated fallback photo. */
     private function resolve(string $query, string $placement, bool $optional = false, float $minFresh = 2.5): ?string
     {
+        if ($this->catalog->ready()) {
+            $url = $this->fromCatalog($query, $placement, $optional, $minFresh);
+            if ($url !== null || $optional) {
+                return $url;
+            }
+            // Required image with no relevant catalog photo: fall through to the other sources.
+        }
+
         if ($placement !== 'portrait' && config('ai.unsplash_access_key')) {
             $url = $this->searchUnsplash($query, $placement);
             if ($url) {
@@ -163,6 +197,71 @@ class ImageResolver
         };
 
         return "https://images.unsplash.com/photo-{$id}?{$params}";
+    }
+
+    /* ---------------- Stock photo catalog ---------------- */
+
+    /**
+     * Pick from the catalog. Scores come from PhotoCatalog::search(); roughly,
+     * an exact subject match is 5, a tag match 2.5, a word in the description 1.
+     */
+    private function fromCatalog(string $query, string $placement, bool $optional, float $minFresh): ?string
+    {
+        // The library's thresholds are on its own scale (3 = primary tag); map to the catalog's.
+        $good = $minFresh >= 2.5 ? 4.0 : 2.5;
+        $candidates = $this->catalog->search($query, $this->siteHint, $placement, array_keys($this->used), 8);
+
+        if (!$candidates || $candidates[0]['score'] < ($optional ? $good : 1.5)) {
+            return null; // nothing relevant: decorative → none, required → other sources
+        }
+
+        $pick = $candidates[0];
+        if ($this->rerankNext && count($candidates) >= 3 && config('ai.photos.rerank')) {
+            $pick = $this->rerank($query, $candidates) ?? $pick;
+        }
+
+        $this->used[$pick['photo']['key']] = true;
+
+        return $this->catalog->url($pick['photo'], $placement);
+    }
+
+    /**
+     * Let the AI choose among close candidates for the photos that matter most (hero, about),
+     * using their vision descriptions. One short text call; any failure keeps the top score.
+     */
+    private function rerank(string $query, array $candidates): ?array
+    {
+        // Only worth a call when there are real alternatives (within reach of the top score).
+        $close = array_values(array_filter($candidates, fn ($c) => $c['score'] >= $candidates[0]['score'] * 0.6));
+        if (count($close) < 2) {
+            return null;
+        }
+
+        try {
+            $provider = $this->provider ??= app(ChatProvider::class);
+            $list = '';
+            foreach ($close as $i => $c) {
+                $list .= ($i + 1) . '. ' . ($c['photo']['text'] ? trim($c['photo']['text']) : $c['photo']['label']) . "\n";
+            }
+            $result = $provider->complete(new ChatRequest(
+                model: $provider->model('edit'),
+                messages: [
+                    ['role' => 'system', 'content' => 'You choose the single best stock photo for a website section. Prefer the photo whose description most literally matches the request and the business, is uncluttered enough for headline text (hero), and looks professional. Answer with JSON.'],
+                    ['role' => 'user', 'content' => "Request: {$query}\nBusiness: " . ($this->siteHint ?: 'unknown') . "\n\nCandidates:\n{$list}"],
+                ],
+                schemaName: 'photo_choice',
+                schema: ['type' => 'object', 'properties' => ['choice' => ['type' => 'integer'], 'reason' => ['type' => 'string']], 'required' => ['choice', 'reason'], 'additionalProperties' => false],
+                maxTokens: 80,
+                temperature: 0,
+            ));
+            $choice = (int) (json_decode((string) $result->content, true)['choice'] ?? 0);
+
+            return $close[$choice - 1] ?? null;
+        } catch (\Throwable $e) {
+            Log::info('Photo rerank skipped', ['error' => $e->getMessage()]);
+
+            return null;
+        }
     }
 
     /* ---------------- Curated library ---------------- */
