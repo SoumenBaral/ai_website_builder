@@ -41,7 +41,7 @@
 
                 @elseif($elType === 'icon')
                     <div class="{{ $iconSizes[$el['size'] ?? '4xl'] ?? 'text-4xl' }} {{ $alignMap[$el['align'] ?? 'center'] ?? 'text-center' }}">
-                        {!! $el['emoji'] ?? '' !!}
+                        {{ $el['emoji'] ?? '' }}
                     </div>
 
                 @elseif($elType === 'button')
@@ -57,7 +57,7 @@
                         }
                     @endphp
                     <div class="{{ $alignMap[$el['align'] ?? 'center'] ?? 'text-center' }}">
-                        <a href="{{ $el['href'] ?? '#' }}" class="{{ $btnClass }}" style="{{ $btnStyle }}">{{ $el['text'] ?? 'Button' }}</a>
+                        <a href="{{ \App\Support\SiteHtml::href($el['href'] ?? '#') }}" class="{{ $btnClass }}" style="{{ $btnStyle }}">{{ $el['text'] ?? 'Button' }}</a>
                     </div>
 
                 @elseif($elType === 'divider')

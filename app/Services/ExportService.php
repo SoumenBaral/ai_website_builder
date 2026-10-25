@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Project;
 use App\Services\Ai\BlockCatalog;
 use App\Services\Logo\FaviconService;
+use App\Support\SiteHtml;
 use App\Services\Shop\Shop;
 use App\Services\Ai\Color;
 use Illuminate\Support\Facades\Storage;
@@ -21,7 +22,7 @@ class ExportService
      * @param callable|null $itemUrl     fn(string $anchor, string $slug): string — where card details pages live
      * @param array|null    $shop        ['mode' => live|preview|static, 'orderUrl' => ?string, 'key' => string] — cart setup
      */
-    public function toHtml(array $schema, ?string $beacon = null, ?array $favicon = null, ?string $faviconBase = null, ?callable $itemUrl = null, ?array $shop = null): string
+    public function toHtml(array $schema, ?string $beacon = null, ?array $favicon = null, ?string $faviconBase = null, ?callable $itemUrl = null, ?array $shop = null, ?string $url = null): string
     {
         // Section ids make in-page links ("#about", "#contact") work on published sites.
         $sections = array_values($schema['sections']);
@@ -38,7 +39,48 @@ class ExportService
             })
             ->implode("\n");
 
-        return $this->page($schema, $schema['meta'], $body, $beacon, app(FaviconService::class)->headTags($favicon, $schema, $faviconBase), self::usesAnimations($schema), $this->shopConfig($schema, $itemUrl, $shop));
+        $head = app(FaviconService::class)->headTags($favicon, $schema, $faviconBase) . $this->homeHead($schema, $url);
+
+        return $this->page($schema, $schema['meta'], $body, $beacon, $head, self::usesAnimations($schema), $this->shopConfig($schema, $itemUrl, $shop));
+    }
+
+    /**
+     * Home page <head> extras: preload the hero photo (the largest thing on screen, so the
+     * browser fetches it before parsing the body), plus canonical / Open Graph / JSON-LD
+     * when the page has a public URL.
+     */
+    private function homeHead(array $schema, ?string $url): string
+    {
+        $out = '';
+        $hero = collect($schema['sections'] ?? [])->firstWhere('type', 'hero')['props'] ?? [];
+        $heroImage = $hero['image'] ?? $hero['backgroundImage'] ?? null;
+        if (is_string($heroImage) && $heroImage !== '') {
+            $srcset = SiteHtml::srcset($heroImage);
+            $out .= "\n" . '<link rel="preload" as="image" href="' . e($heroImage) . '"' . ($srcset ? ' imagesrcset="' . e($srcset) . '" imagesizes="100vw"' : '') . ' fetchpriority="high">';
+        }
+
+        if ($url) {
+            $meta = $schema['meta'] ?? [];
+            $title = (string) ($meta['title'] ?? '');
+            $description = (string) ($meta['description'] ?? '');
+            $brand = (string) (collect($schema['sections'] ?? [])->firstWhere('type', 'navbar')['props']['brand'] ?? $title);
+            $out .= "\n" . '<link rel="canonical" href="' . e($url) . '">'
+                . "\n" . '<meta property="og:type" content="website">'
+                . "\n" . '<meta property="og:url" content="' . e($url) . '">'
+                . "\n" . '<meta property="og:title" content="' . e($title) . '">'
+                . "\n" . '<meta property="og:description" content="' . e($description) . '">'
+                . "\n" . '<meta property="og:site_name" content="' . e($brand) . '">'
+                . (is_string($heroImage) && $heroImage !== '' ? "\n" . '<meta property="og:image" content="' . e($heroImage) . '">' . "\n" . '<meta name="twitter:card" content="summary_large_image">' : "\n" . '<meta name="twitter:card" content="summary">')
+                . "\n" . '<script type="application/ld+json">' . json_encode([
+                    '@context' => 'https://schema.org',
+                    '@type' => 'WebSite',
+                    'name' => $brand,
+                    'url' => $url,
+                    'description' => $description,
+                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) . '</script>';
+        }
+
+        return $out;
     }
 
     /**
@@ -128,6 +170,7 @@ class ExportService
             . ($photos ? "\n" . '<meta property="og:image" content="' . e($photos[0]) . '">' : '')
             . "\n" . '<script type="application/ld+json">' . json_encode(self::structuredData($type, $item, $title, $description, $photos), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) . '</script>';
 
+        // Details pages animate their own gallery and related cards, so the runtime always ships.
         return $this->page($schema, $meta, $body, $beacon, $head, true, $shopConfig);
     }
 
@@ -250,21 +293,65 @@ class ExportService
 
     private function page(array $schema, array $meta, string $body, ?string $beacon, string $head, bool $motion, ?array $shop = null): string
     {
+        // Served pages link the prebuilt, hashed, cacheable files in public/site (npm run build:site);
+        // ZIP downloads inline everything so they work offline. Missing build → inline as a fallback.
+        $animCss = $motion ? $this->siteAsset('anim.css', 'css/site-animations.css') : null;
+        $animJs = $motion ? $this->siteAsset('anim.js', 'js/site/animRuntime.js') : null;
+        $shopCss = $shop ? $this->siteAsset('shop.css', 'css/site-shop.css') : null;
+        $shopJs = $shop ? $this->siteAsset('cart.js', 'js/site/cartRuntime.js') : null;
+
         return view('export.shell', [
             'tailwind' => $this->tailwind(),
             'shop' => $shop ? [
-                'css' => file_get_contents(resource_path('css/site-shop.css')),
+                'css' => $shopCss['inline'] ?? null,
+                'cssHref' => $shopCss['href'] ?? null,
                 'config' => json_encode($shop, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP),
-                'runtime' => file_get_contents(resource_path('js/site/cartRuntime.js')),
+                'runtime' => $shopJs['inline'] ?? null,
+                'runtimeHref' => $shopJs['href'] ?? null,
             ] : null,
             'meta' => $meta,
-            'theme' => $schema['theme'],
+            'theme' => $theme = self::safeTheme($schema['theme']),
+            'fonts' => array_values(array_unique(array_filter([$theme['fontHeading'], $theme['fontBody']]))),
             'body' => $body,
             'beacon' => $beacon,
             'head' => $head,
-            'animations' => $motion ? file_get_contents(resource_path('css/site-animations.css')) : null,
-            'animationRuntime' => $motion ? file_get_contents(resource_path('js/site/animRuntime.js')) : null,
+            'motion' => $motion,
+            'animations' => $animCss['inline'] ?? null,
+            'animationsHref' => $animCss['href'] ?? null,
+            'animationRuntime' => $animJs['inline'] ?? null,
+            'animationRuntimeHref' => $animJs['href'] ?? null,
         ])->render();
+    }
+
+    /**
+     * Theme values go into a <style> block, where HTML escaping is no defence:
+     * colours must be hex and font names plain words, or they are replaced.
+     */
+    public static function safeTheme(array $theme): array
+    {
+        $font = fn ($v, $default) => is_string($v) && preg_match('/^[\p{L}\p{N} \-]{1,60}$/u', trim($v)) ? trim($v) : $default;
+
+        return [
+            'primaryColor' => Color::normalize($theme['primaryColor'] ?? null) ?? '#2563eb',
+            'secondaryColor' => Color::normalize($theme['secondaryColor'] ?? null) ?? (Color::normalize($theme['primaryColor'] ?? null) ?? '#0f172a'),
+            'backgroundColor' => Color::normalize($theme['backgroundColor'] ?? null) ?? '#ffffff',
+            'textColor' => Color::normalize($theme['textColor'] ?? null) ?? '#0f172a',
+            'fontHeading' => $font($theme['fontHeading'] ?? null, 'Inter'),
+            'fontBody' => $font($theme['fontBody'] ?? null, 'Inter'),
+            'radius' => in_array($theme['radius'] ?? null, ['none', 'sm', 'md', 'lg', 'xl', 'full'], true) ? $theme['radius'] : 'md',
+            'mode' => ($theme['mode'] ?? 'light') === 'dark' ? 'dark' : 'light',
+        ] + $theme;
+    }
+
+    /** @return array{href?: string, inline?: string} a hashed public URL, or the file's contents */
+    private function siteAsset(string $built, string $source): array
+    {
+        $path = public_path("site/{$built}");
+        if (!$this->inlineCss && is_file($path)) {
+            return ['href' => "/site/{$built}?v=" . substr(md5_file($path), 0, 10)];
+        }
+
+        return ['inline' => file_get_contents(resource_path($source))];
     }
 
     /** The details page button: the card's own, else the site's contact section, else its main CTA. */

@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use App\Models\StockPhoto;
 use App\Services\Photos\PexelsClient;
 use App\Services\Photos\PhotoCatalog;
+use App\Services\Photos\PhotoSource;
+use App\Services\Photos\UnsplashClient;
 use App\Services\Photos\PhotoTopics;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
@@ -16,19 +18,20 @@ use Illuminate\Support\Facades\Http;
 class PhotosImport extends Command
 {
     protected $signature = 'photos:import
+        {--source= : pexels|unsplash (default: whichever key is configured)}
         {--per-topic=20 : Photos to fetch per topic}
         {--topic=* : Only these topics (default: all in PhotoTopics)}
         {--category=* : Only topics in these categories}
         {--no-verify : Skip the HEAD request that checks each image really loads}
         {--dry-run : Show what would be fetched without calling the API}';
 
-    protected $description = 'Import 2,000+ stock photos from Pexels into the catalog (needs PEXELS_API_KEY)';
+    protected $description = 'Import 2,000+ stock photos from Pexels or Unsplash into the catalog';
 
     public function handle(): int
     {
-        $key = config('ai.photos.pexels_key');
-        if (!$key && !$this->option('dry-run')) {
-            $this->error('PEXELS_API_KEY is not set. Create a free key at https://www.pexels.com/api/ and add it to .env.');
+        $source = $this->source();
+        if (!$source && !$this->option('dry-run')) {
+            $this->error('No photo API key. Set PEXELS_API_KEY (https://www.pexels.com/api/) or UNSPLASH_ACCESS_KEY (https://unsplash.com/developers) in .env.');
 
             return self::FAILURE;
         }
@@ -51,28 +54,29 @@ class PhotosImport extends Command
             return self::SUCCESS;
         }
 
-        $client = new PexelsClient($key);
+        $client = $source;
+        $this->info("Source: {$client->name()}");
         $added = $skipped = $broken = 0;
         $bar = $this->output->createProgressBar(count($topics));
         $bar->start();
 
         foreach ($topics as $t) {
             // Every topic already full? Skip the API call entirely.
-            if (StockPhoto::where('topic', $t['topic'])->count() >= $perTopic) {
+            if (StockPhoto::where('topic', $t['topic'])->where('source', $client->name())->count() >= $perTopic) {
                 $bar->advance();
                 continue;
             }
 
             $page = 1;
-            $have = StockPhoto::where('topic', $t['topic'])->count();
+            $have = StockPhoto::where('topic', $t['topic'])->where('source', $client->name())->count();
             while ($have < $perTopic && $page <= 3) {
                 try {
                     $result = $client->search($t['topic'], min(80, $perTopic * 2), $page, $t['category'] === 'people' ? 'portrait' : null);
                 } catch (\RuntimeException $e) {
-                    if (str_contains($e->getMessage(), 'HTTP 429')) {
+                    if (str_contains($e->getMessage(), 'HTTP 429') || str_contains($e->getMessage(), 'HTTP 403')) {
                         $this->newLine();
-                        $this->warn('Pexels rate limit reached — waiting 60s…');
-                        sleep(60);
+                        $this->warn(ucfirst($client->name()) . ' hourly limit reached — waiting 5 minutes, then continuing…');
+                        sleep(300);
                         continue;
                     }
                     $this->newLine();
@@ -87,7 +91,7 @@ class PhotosImport extends Command
                     if ($have >= $perTopic) {
                         break;
                     }
-                    if (!$photo['url'] || StockPhoto::where('source', 'pexels')->where('source_id', $photo['source_id'])->exists()) {
+                    if (!$photo['url'] || StockPhoto::where('source', $photo['source'])->where('source_id', $photo['source_id'])->exists()) {
                         $skipped++;
                         continue;
                     }
@@ -102,10 +106,10 @@ class PhotosImport extends Command
                     $have++;
                 }
                 $page++;
-                if ($result['remaining'] !== null && $result['remaining'] < 3) {
+                if ($result['remaining'] !== null && $result['remaining'] < 2) {
                     $this->newLine();
-                    $this->warn('Pexels hourly quota nearly used — waiting 60s…');
-                    sleep(60);
+                    $this->warn(ucfirst($client->name()) . ' hourly quota used up — waiting 5 minutes, then continuing…');
+                    sleep(300);
                 }
             }
             $bar->advance();
@@ -121,6 +125,21 @@ class PhotosImport extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    private function source(): ?PhotoSource
+    {
+        $want = $this->option('source');
+        $pexels = config('ai.photos.pexels_key');
+        $unsplash = config('ai.unsplash_access_key');
+        if ($want === 'pexels' || (!$want && $pexels)) {
+            return $pexels ? new PexelsClient($pexels) : null;
+        }
+        if ($want === 'unsplash' || (!$want && $unsplash)) {
+            return $unsplash ? new UnsplashClient($unsplash) : null;
+        }
+
+        return null;
     }
 
     private function loads(string $url): bool

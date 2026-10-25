@@ -65,7 +65,7 @@ it('renders a complete, safe details page', function () {
         ->toContain('href="/s/forma/services/oxford-shirt-2"')               // related / next
         ->toContain('"@type":"Product"')->toContain('"price":"45"')->toContain('"priceCurrency":"USD"')
         ->toContain('og:image')
-        ->toContain('window.SiteAnim');
+        ->toContain('window.SiteAnim')->and(with_site_assets($html))->toContain('IntersectionObserver');
 
     $bangla = app(ExportService::class)->itemHtml(shop_schema(), 'services', ItemPages::map(shop_schema())[1]['slugs'][2], '/s/forma', fn ($a, $s) => "/s/forma/{$a}/{$s}");
     expect($bangla)->toContain('বাংলা শার্ট')->toContain('Ask us')->not->toContain('javascript:alert');

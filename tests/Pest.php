@@ -16,6 +16,8 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    // Any HTTP call a test did not fake is a bug (it would hit a real API with real keys).
+    ->beforeEach(fn () => \Illuminate\Support\Facades\Http::preventStrayRequests())
     ->in('Feature');
 
 /*
@@ -44,7 +46,19 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Served pages link the prebuilt /site/*.js|css files instead of inlining them. For assertions
+ * about "what the visitor's browser ends up running", fold those files back into the HTML.
+ */
+function with_site_assets(string $html): string
 {
-    // ..
+    preg_match_all('#(?:src|href)="(/site/[a-z]+\.(?:js|css))\?v=[a-f0-9]+"#', $html, $m);
+    foreach (array_unique($m[1]) as $file) {
+        $path = public_path(ltrim($file, '/'));
+        if (is_file($path)) {
+            $html .= "\n<!-- {$file} -->\n" . file_get_contents($path);
+        }
+    }
+
+    return $html;
 }

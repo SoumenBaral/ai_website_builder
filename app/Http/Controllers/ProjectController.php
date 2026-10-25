@@ -15,11 +15,14 @@ class ProjectController extends Controller
     {
         $user = $request->user();
 
+        // Home pages without their (large) schema JSON; previews come from a cache keyed by
+        // the page's revision, so a schema is only loaded when that site actually changed.
         $projects = $user->projects()
-            ->with('homePage:id,project_id,schema')
+            ->with('homePage:id,project_id,updated_at')
             ->withCount('pages')
             ->latest('updated_at')
             ->get();
+        $summaries = $projects->mapWithKeys(fn (Project $project) => [$project->id => $this->summaryFor($project)]);
 
         // Page views over the last 30 days, one grouped query for all projects.
         $views = AnalyticsEvent::whereIn('project_id', $projects->pluck('id'))
@@ -46,21 +49,40 @@ class ProjectController extends Controller
                 'views' => (int) ($views[$project->id] ?? 0),
                 'created_at' => $project->created_at,
                 'updated_at' => $project->updated_at,
-                'preview' => $this->previewFor($project),
-                'shop' => \App\Services\Shop\Shop::enabled($project->homePage?->schema ?? []),
+                'preview' => $summaries[$project->id]['preview'],
+                'shop' => $summaries[$project->id]['shop'],
                 'orders' => (int) ($orders[$project->id]->total ?? 0),
                 'newOrders' => (int) ($orders[$project->id]->fresh ?? 0),
             ])->values(),
         ]);
     }
 
+    /** @return array{preview: array, shop: bool} cached until the home page changes */
+    private function summaryFor(Project $project): array
+    {
+        $page = $project->homePage;
+        if (!$page) {
+            return ['preview' => $this->previewFor([]), 'shop' => false];
+        }
+
+        return \Illuminate\Support\Facades\Cache::remember(
+            "project-summary:{$page->id}:" . $page->updated_at?->getTimestamp(),
+            86400,
+            function () use ($page) {
+                $schema = \App\Models\Page::whereKey($page->id)->value('schema') ?? [];
+                $schema = is_string($schema) ? (json_decode($schema, true) ?: []) : $schema;
+
+                return ['preview' => $this->previewFor($schema), 'shop' => \App\Services\Shop\Shop::enabled($schema)];
+            },
+        );
+    }
+
     /**
      * A lightweight summary of the home page (theme + first sections) so the
      * dashboard can draw a miniature of each site without loading full schemas.
      */
-    private function previewFor(Project $project): array
+    private function previewFor(array $schema): array
     {
-        $schema = $project->homePage?->schema ?? [];
         $theme = $schema['theme'] ?? [];
         $sections = collect($schema['sections'] ?? []);
         $hero = $sections->firstWhere('type', 'hero')['props'] ?? [];

@@ -10,7 +10,11 @@ use Illuminate\Database\Eloquent\Model;
  */
 class StockPhoto extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'source', 'source_id', 'url', 'thumb_url', 'width', 'height', 'orientation', 'category', 'topic', 'alt',
+        'avg_color', 'photographer', 'photographer_url', 'ai_description', 'ai_tags', 'ai_subjects', 'people',
+        'person', 'mood', 'placements', 'search_text', 'analyzed_at',
+    ];
 
     protected $casts = [
         'ai_tags' => 'array',

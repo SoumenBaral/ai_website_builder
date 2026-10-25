@@ -12,7 +12,7 @@
             @if(!empty($props['images']))
                 @foreach($props['images'] as $image)
                     <div class="overflow-hidden" style="border-radius: var(--radius);">
-                        <img src="{{ $image['src'] ?? '' }}" alt="{{ $image['caption'] ?? '' }}" class="w-full h-64 object-cover">
+                        <img {!! \App\Support\SiteHtml::img($image['src'] ?? '', '(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw', [480, 768, 1024]) !!} alt="{{ $image['caption'] ?? '' }}" class="w-full h-64 object-cover">
                         @if(!empty($image['caption']))
                             <p class="text-sm mt-2 opacity-70 text-center">{{ $image['caption'] }}</p>
                         @endif

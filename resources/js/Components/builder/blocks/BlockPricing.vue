@@ -44,7 +44,7 @@ function onEditFeature(e, planIndex, featureIndex) {
 <template>
     <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
         <div class="max-w-6xl mx-auto">
-            <img v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-10" :class="imageClasses" />
+            <img loading="lazy" decoding="async" v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-10" :class="imageClasses" />
 
             <h2
                 class="text-3xl md:text-4xl font-bold text-center mb-12"

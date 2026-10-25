@@ -56,7 +56,7 @@ function onEditItem(e, index, key) {
                             v-if="item.avatar"
                             class="w-12 h-12 rounded-full bg-gray-300 overflow-hidden flex-shrink-0"
                         >
-                            <img :src="item.avatar" :alt="item.author" class="w-full h-full object-cover" />
+                            <img loading="lazy" decoding="async" :src="item.avatar" :alt="item.author" class="w-full h-full object-cover" />
                         </div>
                         <div
                             v-else

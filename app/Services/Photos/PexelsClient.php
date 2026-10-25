@@ -8,9 +8,14 @@ use Illuminate\Support\Facades\Http;
  * Minimal Pexels API client (https://www.pexels.com/api/documentation/).
  * Photos are hot-linked from images.pexels.com, which Pexels permits with attribution.
  */
-class PexelsClient
+class PexelsClient implements PhotoSource
 {
     public function __construct(private string $apiKey) {}
+
+    public function name(): string
+    {
+        return 'pexels';
+    }
 
     /**
      * @return array{photos: array<int, array>, total: int, remaining: ?int}

@@ -87,13 +87,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-// Public site
-Route::get('/s/{slug}', [PublicSiteController::class, 'show'])->name('site.show');
+// Public site + analytics beacon: no session, cookies, CSRF or Inertia — anonymous visitors
+// get cacheable responses and never create session rows.
+Route::withoutMiddleware([
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\Cookie\Middleware\EncryptCookies::class,
+    \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+    \Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
+    \App\Http\Middleware\HandleInertiaRequests::class,
+    \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
+])->group(function () {
+    Route::get('/s/{slug}', [PublicSiteController::class, 'show'])->name('site.show');
+    Route::get('/s/{slug}/sitemap.xml', [PublicSiteController::class, 'sitemap'])->name('site.sitemap');
+    Route::get('/s/{slug}/robots.txt', [PublicSiteController::class, 'robots'])->name('site.robots');
+    Route::get('/s/{slug}/{section}/{item}', [PublicSiteController::class, 'item'])
+        ->where(['section' => '[a-z0-9-]+', 'item' => '[a-z0-9-]+'])->name('site.item');
+    Route::post('/track', [AnalyticsController::class, 'store'])->middleware('throttle:60,1')->name('analytics.track');
+});
 Route::post('/s/{slug}/orders', [\App\Http\Controllers\OrderController::class, 'store'])->middleware('throttle:8,1')->name('site.order');
-Route::get('/s/{slug}/{section}/{item}', [PublicSiteController::class, 'item'])
-    ->where(['section' => '[a-z0-9-]+', 'item' => '[a-z0-9-]+'])->name('site.item');
-
-// Analytics beacon (no auth)
-Route::post('/track', [AnalyticsController::class, 'store'])->name('analytics.track');
 
 require __DIR__.'/auth.php';

@@ -1,4 +1,10 @@
 import { defineStore } from 'pinia';
+import { markRaw, toRaw } from 'vue';
+
+/** Edits to the same field within this window share one undo step (typing, colour pickers). */
+const GROUP_MS = 700;
+
+const snapshot = (schema) => markRaw(JSON.parse(JSON.stringify(toRaw(schema))));
 
 export const useEditor = defineStore('editor', {
     state: () => ({
@@ -8,6 +14,12 @@ export const useEditor = defineStore('editor', {
         future: [],
         dirty: false,
         saving: false,
+        // Bumped on every change; a save only marks the editor clean if nothing changed meanwhile.
+        revision: 0,
+        // True while a full-site AI edit streams: the canvas is read-only so nothing typed gets lost.
+        locked: false,
+        lastGroup: null,
+        lastGroupAt: 0,
     }),
 
     getters: {
@@ -36,12 +48,21 @@ export const useEditor = defineStore('editor', {
             this.selectedId = null;
             this.dirty = false;
             this.saving = false;
+            this.locked = false;
+            this.revision = 0;
+            this.lastGroup = null;
         },
 
         setSchema(schema) {
             this.pushHistory();
             this.schema = JSON.parse(JSON.stringify(schema));
+            this.touch();
+        },
+
+        /** Every mutation ends here: marks the page unsaved and invalidates in-flight saves. */
+        touch() {
             this.dirty = true;
+            this.revision++;
         },
 
         select(id) {
@@ -49,30 +70,32 @@ export const useEditor = defineStore('editor', {
         },
 
         updateProps(id, patch) {
-            this.pushHistory();
             const block = this.schema.sections.find(s => s.id === id);
-            if (block) {
-                block.props = { ...block.props, ...patch };
-                this.dirty = true;
-            }
+            if (!block) return;
+            // Unchanged value (e.g. a contenteditable blur with no edit): not a change at all.
+            if (Object.keys(patch).every((k) => JSON.stringify(block.props[k]) === JSON.stringify(patch[k]))) return;
+            this.pushHistory(`props:${id}:${Object.keys(patch).join(',')}`);
+            block.props = { ...block.props, ...patch };
+            this.touch();
         },
 
         updateTheme(patch) {
-            this.pushHistory();
+            this.pushHistory(`theme:${Object.keys(patch).join(',')}`);
             this.schema.theme = { ...this.schema.theme, ...patch };
-            this.dirty = true;
+            this.touch();
         },
 
         updateMeta(patch) {
-            this.pushHistory();
+            this.pushHistory(`meta:${Object.keys(patch).join(',')}`);
             this.schema.meta = { ...this.schema.meta, ...patch };
-            this.dirty = true;
+            this.touch();
         },
 
         reorder(newSections) {
+            if (newSections.map((s) => s.id).join() === this.schema.sections.map((s) => s.id).join()) return; // nothing moved
             this.pushHistory();
             this.schema.sections = newSections;
-            this.dirty = true;
+            this.touch();
         },
 
         addBlock(block, index) {
@@ -82,17 +105,17 @@ export const useEditor = defineStore('editor', {
             } else {
                 this.schema.sections.push(block);
             }
-            this.dirty = true;
+            this.touch();
             this.selectedId = block.id;
         },
 
         updateSection(id, newSection) {
-            this.pushHistory();
             const idx = this.schema.sections.findIndex(s => s.id === id);
-            if (idx !== -1) {
-                this.schema.sections[idx] = newSection;
-                this.dirty = true;
-            }
+            if (idx === -1) return false; // the section was removed while the AI worked
+            this.pushHistory();
+            this.schema.sections[idx] = { ...newSection, id };
+            this.touch();
+            return true;
         },
 
         duplicateBlock(id) {
@@ -119,38 +142,52 @@ export const useEditor = defineStore('editor', {
             if (this.selectedId === id) {
                 this.selectedId = null;
             }
-            this.dirty = true;
+            this.touch();
         },
 
-        pushHistory() {
-            if (this.schema) {
-                this.history.push(JSON.parse(JSON.stringify(this.schema)));
-                this.future = [];
-                // Keep history manageable
-                if (this.history.length > 50) {
-                    this.history.shift();
-                }
+        /**
+         * Snapshot for undo. Consecutive edits to the same field (a word being typed, a colour
+         * being dragged) collapse into one step, so undo goes back an edit, not a keystroke.
+         */
+        pushHistory(group = null) {
+            if (!this.schema) return;
+            const now = Date.now();
+            if (group && group === this.lastGroup && now - this.lastGroupAt < GROUP_MS) {
+                this.lastGroupAt = now;
+                return;
+            }
+            this.lastGroup = group;
+            this.lastGroupAt = now;
+            this.history.push(snapshot(this.schema));
+            this.future = [];
+            if (this.history.length > 100) {
+                this.history.shift();
             }
         },
 
         undo() {
             if (this.history.length) {
-                this.future.push(JSON.parse(JSON.stringify(this.schema)));
-                this.schema = this.history.pop();
-                this.dirty = true;
+                this.future.push(snapshot(this.schema));
+                this.schema = JSON.parse(JSON.stringify(this.history.pop()));
+                this.lastGroup = null;
+                this.touch();
             }
         },
 
         redo() {
             if (this.future.length) {
-                this.history.push(JSON.parse(JSON.stringify(this.schema)));
-                this.schema = this.future.pop();
-                this.dirty = true;
+                this.history.push(snapshot(this.schema));
+                this.schema = JSON.parse(JSON.stringify(this.future.pop()));
+                this.lastGroup = null;
+                this.touch();
             }
         },
 
-        markClean() {
-            this.dirty = false;
+        /** @param {number} [revision] the revision that was saved; later edits keep the page dirty */
+        markClean(revision = this.revision) {
+            if (revision === this.revision) {
+                this.dirty = false;
+            }
             this.saving = false;
         },
     },

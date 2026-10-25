@@ -48,7 +48,7 @@ function onEditItem(e, index, key) {
                 @blur="onEdit($event, 'heading')"
             >{{ heading }}</h2>
 
-            <img v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-10" :class="imageClasses" />
+            <img loading="lazy" decoding="async" v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-10" :class="imageClasses" />
 
             <div class="grid gap-8" :class="gridClass">
                 <div
@@ -57,7 +57,7 @@ function onEditItem(e, index, key) {
                     class="border hover:shadow-xl transition-all duration-300 group overflow-hidden"
                     :style="{ borderRadius: 'var(--radius)', background: 'var(--surface)', borderColor: 'var(--line)' }"
                 >
-                    <img v-if="item.image" :src="item.image" :alt="item.title" class="w-full h-40 object-cover" />
+                    <img loading="lazy" decoding="async" v-if="item.image" :src="item.image" :alt="item.title" class="w-full h-40 object-cover" />
                     <div class="p-8">
                     <div
                         v-if="item.icon"

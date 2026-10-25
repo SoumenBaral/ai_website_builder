@@ -12,8 +12,12 @@
 <section class="flex flex-col md:flex-row items-stretch md:min-h-[{{ $minH }}]">
     {{-- Image side --}}
     {{-- Focus near the top: people's heads (and most subjects) sit in the upper part of a photo. --}}
-    <div class="block w-full h-80 sm:h-[28rem] md:h-auto md:w-1/2 bg-cover order-1 {{ $layout === 'split-left' ? 'md:order-1' : 'md:order-2' }}"
-         style="background-image: url('{{ $image }}'); background-position: 50% 18%; {{ !$image ? 'background-color: var(--secondary, #e2e8f0);' : '' }}"></div>
+    <div class="relative block w-full h-80 sm:h-[28rem] md:h-auto md:w-1/2 order-1 {{ $layout === 'split-left' ? 'md:order-1' : 'md:order-2' }}"
+         style="{{ !$image ? 'background-color: var(--secondary, #e2e8f0);' : '' }}">
+        @if($image)
+            <img {!! \App\Support\SiteHtml::img($image, '(min-width: 768px) 50vw, 100vw') !!} alt="" fetchpriority="high" decoding="async" class="absolute inset-0 w-full h-full object-cover" style="object-position: 50% 18%;">
+        @endif
+    </div>
     {{-- Text side --}}
     <div class="w-full md:w-1/2 flex items-center order-2 {{ $layout === 'split-left' ? 'md:order-2' : 'md:order-1' }}"
          style="background-color: var(--bg); color: var(--text);">
@@ -25,7 +29,7 @@
                 <p class="text-lg md:text-xl mb-8 opacity-90">{{ $props['subheading'] }}</p>
             @endif
             @if(!empty($props['ctaText']))
-                <a href="{{ $props['ctaHref'] ?? '#' }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
+                <a href="{{ \App\Support\SiteHtml::href($props['ctaHref'] ?? '#') }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                     {{ $props['ctaText'] }}
                 </a>
             @endif
@@ -35,7 +39,7 @@
 @else
 <section class="relative flex items-center {{ $textAlign }}" style="min-height: {{ $minH }}; background-color: var(--bg); color: var(--text); font-family: var(--font-body);">
     @if(!empty($image))
-        <div class="absolute inset-0 bg-cover" style="background-image: url('{{ $image }}'); background-position: 50% 30%;"></div>
+        <img {!! \App\Support\SiteHtml::img($image, '100vw') !!} alt="" fetchpriority="high" decoding="async" class="absolute inset-0 w-full h-full object-cover" style="object-position: 50% 30%;">
         <div class="absolute inset-0" style="background-color: rgba(0,0,0,{{ $overlay }});"></div>
     @endif
     <div class="relative z-10 w-full max-w-4xl mx-auto px-6 py-20 {{ $textAlign }}">
@@ -46,11 +50,11 @@
             <p class="text-lg md:text-xl mb-8 opacity-90 {{ !empty($image) ? 'text-white/80' : '' }}">{{ $props['subheading'] }}</p>
         @endif
         @if(!empty($props['ctaText']))
-            <a href="{{ $props['ctaHref'] ?? '#' }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
+            <a href="{{ \App\Support\SiteHtml::href($props['ctaHref'] ?? '#') }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                 {{ $props['ctaText'] }}
             </a>
         @elseif(!empty($props['cta']['label']))
-            <a href="{{ $props['cta']['url'] ?? '#' }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
+            <a href="{{ \App\Support\SiteHtml::href($props['cta']['url'] ?? '#') }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary); color: var(--on-primary); border-radius: var(--radius);">
                 {{ $props['cta']['label'] }}
             </a>
         @endif

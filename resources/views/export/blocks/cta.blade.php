@@ -12,11 +12,11 @@
         @endif
 
         @if(!empty($props['ctaText']))
-            <a href="{{ $props['ctaHref'] ?? '#' }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--on-primary); color: var(--primary); border-radius: var(--radius);">
+            <a href="{{ \App\Support\SiteHtml::href($props['ctaHref'] ?? '#') }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--on-primary); color: var(--primary); border-radius: var(--radius);">
                 {{ $props['ctaText'] }}
             </a>
         @elseif(!empty($props['button']['label']))
-            <a href="{{ $props['button']['url'] ?? '#' }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--on-primary); color: var(--primary); border-radius: var(--radius);">
+            <a href="{{ \App\Support\SiteHtml::href($props['button']['url'] ?? '#') }}" class="inline-block px-8 py-3 font-semibold transition-opacity hover:opacity-90" style="background-color: var(--on-primary); color: var(--primary); border-radius: var(--radius);">
                 {{ $props['button']['label'] }}
             </a>
         @endif

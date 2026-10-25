@@ -48,7 +48,7 @@ function onEditMember(e, index, key) {
                     <div
                         class="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden bg-gray-200"
                     >
-                        <img
+                        <img loading="lazy" decoding="async"
                             v-if="member.image"
                             :src="member.image"
                             :alt="member.name"

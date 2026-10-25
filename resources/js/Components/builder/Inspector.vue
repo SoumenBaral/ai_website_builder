@@ -1,9 +1,9 @@
 <script setup>
-import { computed, ref, inject } from 'vue';
+import { computed, ref, inject, defineAsyncComponent } from 'vue';
 import { useEditor } from '@/stores/editor.js';
 import { BLOCK_TYPES } from '@/schema/defaults.js';
 import ImagePicker from '@/Components/builder/ImagePicker.vue';
-import CustomElementEditor from '@/Components/builder/CustomElementEditor.vue';
+const CustomElementEditor = defineAsyncComponent(() => import('@/Components/builder/CustomElementEditor.vue'));
 import Icon from '@/Components/Landing/Icon.vue';
 import { blockIcons, humanize, singular, ITEM_FIELDS, CARD_VISUAL_LISTS, ITEM_PAGE_LISTS, DETAIL_FIELDS, itemFields } from './blockMeta';
 import { useToast } from './useToast';
@@ -11,7 +11,7 @@ import { useLogoStudio } from './useLogoStudio';
 import axios from 'axios';
 import { streamAi } from './aiStream';
 import { ANIMATION_INTENT, aiAnimate } from './animPreview';
-import MotionPanel from './MotionPanel.vue';
+const MotionPanel = defineAsyncComponent(() => import('./MotionPanel.vue'));
 
 const projectId = inject('projectId');
 const saveNow = inject('saveNow', null);
@@ -251,16 +251,23 @@ async function askAi(instruction) {
         const wantsMotion = ANIMATION_INTENT.test(text);
         if (aiMode.value === 'section' && block.value) {
             // Edit only the selected section
+            const targetId = block.value.id; // the user may select another section meanwhile
             const { data } = await axios.post(route('ai.editSection'), {
                 section: block.value,
                 theme: editor.schema.theme,
                 instruction: text,
             });
-            editor.updateSection(block.value.id, data.section);
+            if (!editor.updateSection(targetId, data.section)) throw new Error('That section was removed before the AI finished.');
             summary = data.summary;
         } else {
-            // Edit the full site (streamed so long edits don't time out)
-            const data = await streamAi(route('ai.edit'), { schema: editor.schema, instruction: text });
+            // Edit the full site (streamed so long edits don't time out); canvas read-only meanwhile
+            editor.locked = true;
+            let data;
+            try {
+                data = await streamAi(route('ai.edit'), { schema: editor.schema, instruction: text });
+            } finally {
+                editor.locked = false;
+            }
             editor.setSchema(data.schema);
             summary = data.summary;
         }

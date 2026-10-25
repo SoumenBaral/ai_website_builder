@@ -10,16 +10,23 @@ import { blockIcons, blockBlurbs } from './blockMeta';
 const emit = defineEmits(['select']);
 const editor = useEditor();
 const dragging = ref(false);
+let orderBeforeDrag = '';
 
 function onDragStart() {
     dragging.value = true;
+    orderBeforeDrag = editor.schema.sections.map((s) => s.id).join();
     // Save state BEFORE the drag mutates the array
     editor.pushHistory();
 }
 
 function onDragEnd() {
     dragging.value = false;
-    editor.dirty = true;
+    // Grabbing a handle and letting go is not an edit: nothing to save or undo.
+    if (editor.schema.sections.map((s) => s.id).join() === orderBeforeDrag) {
+        editor.history.pop();
+        return;
+    }
+    editor.touch();
 }
 
 function addBlock(type) {

@@ -12,16 +12,16 @@
         @endif
 
         @if(!empty($props['image']))
-            <img src="{{ $props['image'] }}" alt="" class="w-full h-48 object-cover mb-10" style="border-radius: var(--radius);">
+            <img {!! \App\Support\SiteHtml::img($props['image'], '(min-width: 1280px) 1152px, 100vw') !!} alt="" class="w-full h-48 object-cover mb-10" style="border-radius: var(--radius);">
         @endif
 
         <div class="grid {{ $gridClass }} gap-8">
             @if(!empty($props['items']))
                 @foreach($props['items'] as $i => $item)
                     @php $href = $links[$i] ?? null; @endphp
-                    <{{ $href ? 'a' : 'div' }} @if($href) href="{{ $href }}" aria-label="{{ $item['title'] ?? '' }} — view details" @endif class="group block overflow-hidden shadow-md {{ $href ? 'transition-shadow hover:shadow-xl' : '' }}" style="border-radius: var(--radius); background-color: var(--surface); color: inherit; text-decoration: none; border: 1px solid var(--line);">
+                    <{{ $href ? 'a' : 'div' }} @if($href) href="{{ \App\Support\SiteHtml::href($href) }}" aria-label="{{ $item['title'] ?? '' }} — view details" @endif class="group block overflow-hidden shadow-md {{ $href ? 'transition-shadow hover:shadow-xl' : '' }}" style="border-radius: var(--radius); background-color: var(--surface); color: inherit; text-decoration: none; border: 1px solid var(--line);">
                         @if(!empty($item['image']))
-                            <img src="{{ $item['image'] }}" alt="{{ $item['title'] ?? '' }}" class="w-full h-40 object-cover">
+                            <img {!! \App\Support\SiteHtml::img($item['image'], '(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw', [480, 768, 1024]) !!} alt="{{ $item['title'] ?? '' }}" class="w-full h-40 object-cover">
                         @endif
                         <div class="p-6">
                             @if(!empty($item['icon']))

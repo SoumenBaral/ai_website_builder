@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount, onErrorCaptured, nextTick } from 'vue';
 import { replayRequest, canonicalAnimation } from './animPreview';
 import '@/site/animRuntime.js';
 import '../../../css/site-animations.css';
@@ -48,6 +48,15 @@ const props = defineProps({
 
 const emit = defineEmits(['update:props', 'select']);
 const component = computed(() => blockMap[props.block.type]);
+
+// One broken section (odd AI output, a missing prop) must not blank the whole canvas.
+const failed = ref(false);
+onErrorCaptured((err) => {
+    console.error(`Section ${props.block.id} (${props.block.type}) failed to render`, err);
+    failed.value = true;
+    return false;
+});
+watch(() => props.block.props, () => { failed.value = false; }, { deep: true });
 const label = computed(() => BLOCK_TYPES[props.block.type]?.label || props.block.type);
 
 /* ---------- Animation & hover — same runtime + CSS as the published site ---------- */
@@ -168,8 +177,11 @@ const sectionStyle = computed(() => {
         :style="sectionStyle"
         @click.stop="editable && emit('select', block.id)"
     >
+        <div v-if="failed" class="p-8 text-center text-sm text-amber-800 bg-amber-50">
+            This {{ block.type }} section couldn't be shown. Try undo (⌘Z), or delete and re-add it.
+        </div>
         <div
-            v-if="component"
+            v-else-if="component"
             ref="animEl"
             :data-anim="anim || undefined"
             :data-anim-speed="anim ? animSpeed : undefined"

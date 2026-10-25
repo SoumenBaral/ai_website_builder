@@ -89,7 +89,7 @@ function onEditElement(e, index, key) {
                     <!-- Image -->
                     <template v-else-if="el.type === 'image'">
                         <div :class="alignClass(el.align || 'center')">
-                            <img
+                            <img loading="lazy" decoding="async"
                                 v-if="el.src"
                                 :src="el.src"
                                 :alt="el.alt || ''"

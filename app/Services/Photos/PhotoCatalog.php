@@ -155,20 +155,28 @@ class PhotoCatalog
     {
         return match ($photo['source']) {
             'pexels' => PexelsClient::sized($photo['url'], $placement),
+            'unsplash' => UnsplashClient::sized($photo['url'], $placement),
             default => $photo['url'],
         };
     }
 
     public function thumb(array $photo): string
     {
-        return $photo['source'] === 'pexels' ? PexelsClient::sized($photo['url'], 'thumb') : $photo['thumb'];
+        return match ($photo['source']) {
+            'pexels' => PexelsClient::sized($photo['url'], 'thumb'),
+            'unsplash' => UnsplashClient::sized($photo['url'], 'thumb'),
+            default => $photo['thumb'],
+        };
     }
 
-    /** "pexels:123" for a catalog URL already on the page, or null. */
+    /** "pexels:123" / "unsplash:abc" for a catalog URL already on the page, or null. */
     public static function keyFromUrl(string $url): ?string
     {
         if (preg_match('#images\.pexels\.com/photos/(\d+)/#', $url, $m)) {
             return "pexels:{$m[1]}";
+        }
+        if (preg_match('#images\.unsplash\.com/photo-([\w-]+)#', $url, $m)) {
+            return "unsplash:photo-{$m[1]}";
         }
 
         return null;

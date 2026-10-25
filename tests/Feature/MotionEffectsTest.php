@@ -51,7 +51,7 @@ it('publishes effects and custom moves as escaped data the runtime renders', fun
         ['id' => 'f', 'type' => 'footer', 'props' => ['text' => 'x', 'bgEffect' => ['kind' => 'particles', 'name' => "'><script>alert(1)</script>", 'colors' => ['#fff']]]],
     ]));
 
-    expect($html)->toContain('data-anim="custom" data-anim-custom=\'{&quot;name&quot;:&quot;Spin&quot;')
+    expect(with_site_assets($html))->toContain('data-anim="custom" data-anim-custom=\'{&quot;name&quot;:&quot;Spin&quot;')
         ->toContain('data-fx=\'{&quot;kind&quot;:&quot;particles&quot;')
         ->toContain('<div data-anim="fade-up">')     // falls back safely
         ->toContain('mountFx')                        // runtime inlined
@@ -123,7 +123,7 @@ it('publishes button effects and lets the AI set them', function () {
         ['id' => 'h', 'type' => 'hero', 'props' => ['heading' => 'Hi', 'ctaText' => 'Shop now', 'buttonEffect' => 'shine']],
         ['id' => 'c', 'type' => 'cta', 'props' => ['heading' => 'Go', 'buttonEffect' => 'explode']],
     ]));
-    expect($html)->toContain('<div data-btn-fx="shine">')
+    expect(with_site_assets($html))->toContain('<div data-btn-fx="shine">')
         ->toContain('markButtons')
         ->toContain('@keyframes btn-shine')
         ->and(substr_count($html, 'data-btn-fx="'))->toBe(1); // invalid value ignored
@@ -146,7 +146,7 @@ it('publishes heading effects with clean typing phrases', function () {
         ['id' => 'c', 'type' => 'cta', 'props' => ['heading' => 'Go', 'textEffect' => 'matrix']],
     ]));
 
-    expect($html)->toContain('data-text-fx="typing-loop" data-text-speed="slow" data-text-phrases=\'[&quot;Brands that stand out&quot;,&quot;Stores that grow&quot;]\'')
+    expect(with_site_assets($html))->toContain('data-text-fx="typing-loop" data-text-speed="slow" data-text-phrases=\'[&quot;Brands that stand out&quot;,&quot;Stores that grow&quot;]\'')
         ->toContain('<div data-text-fx="typing">')
         ->toContain('Websites that sell')          // real text stays in the HTML (SEO, no-JS)
         ->toContain('textFx')

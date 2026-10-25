@@ -8,8 +8,21 @@
  *
  * Resolves with the `done` payload; rejects with an Error whose message is safe to show.
  */
-export async function streamAi(url, body, onProgress) {
+const IDLE_TIMEOUT_MS = 90000; // no bytes for this long = the request is dead, not slow
+
+export async function streamAi(url, body, onProgress, { signal } = {}) {
     const xsrf = decodeURIComponent((document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/) || [])[1] || '');
+
+    // Our own controller aborts on idle; the caller's signal (Stop button, page leave) aborts too.
+    const controller = new AbortController();
+    signal?.addEventListener('abort', () => controller.abort(), { once: true });
+    let idleTimer = 0;
+    const armIdle = () => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS);
+    };
+    armIdle();
+    const abortMessage = () => (signal?.aborted ? 'Stopped.' : 'The AI stopped responding. Please try again.');
 
     let response;
     try {
@@ -23,9 +36,11 @@ export async function streamAi(url, body, onProgress) {
                 'X-XSRF-TOKEN': xsrf,
             },
             body: JSON.stringify(body),
+            signal: controller.signal,
         });
     } catch {
-        throw new Error('Could not reach the server. Check your connection and try again.');
+        clearTimeout(idleTimer);
+        throw new Error(controller.signal.aborted ? abortMessage() : 'Could not reach the server. Check your connection and try again.');
     }
 
     // Validation errors, limits and auth come back as regular JSON before streaming starts.
@@ -51,8 +66,16 @@ export async function streamAi(url, body, onProgress) {
     };
 
     for (;;) {
-        const { value, done } = await reader.read();
+        let chunk;
+        try {
+            chunk = await reader.read();
+        } catch {
+            clearTimeout(idleTimer);
+            throw new Error(controller.signal.aborted ? abortMessage() : 'The connection dropped. Please try again.');
+        }
+        const { value, done } = chunk;
         if (done) break;
+        armIdle();
         buffer += decoder.decode(value, { stream: true });
         let newline;
         while ((newline = buffer.indexOf('\n')) >= 0) {
@@ -61,6 +84,7 @@ export async function streamAi(url, body, onProgress) {
         }
     }
     handle(buffer);
+    clearTimeout(idleTimer);
 
     if (!result) {
         throw new Error('The connection closed before the AI finished. Please try again.');
