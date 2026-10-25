@@ -22,10 +22,14 @@ class PhotoCatalog
     /** @var array<int, array>|null */
     private ?array $index = null;
 
-    /** Is there a catalog worth using (otherwise callers fall back to the hand-curated ImageLibrary)? */
+    /**
+     * Is there a catalog worth using (otherwise callers fall back to the hand-curated ImageLibrary)?
+     * Only photos the vision model has described count: dataset keywords alone match too loosely
+     * to be trusted for a site's hero image.
+     */
     public function ready(): bool
     {
-        return count($this->index()) >= 50;
+        return count(array_filter($this->index(), fn ($p) => $p['analyzed'])) >= 50;
     }
 
     public function count(): int
@@ -46,6 +50,7 @@ class PhotoCatalog
      */
     public function search(string $query, string $hint = '', string $placement = 'card', array $exclude = [], int $limit = 12, ?string $category = null): array
     {
+        $analyzedOnly = $this->ready();
         $qTokens = $this->tokens($query);
         $qPhrases = $this->phrases($query);
         $hTokens = array_diff($this->tokens($hint), $qTokens);
@@ -56,7 +61,7 @@ class PhotoCatalog
 
         $scored = [];
         foreach ($this->index() as $p) {
-            if (isset($excluded[$p['key']])) {
+            if (isset($excluded[$p['key']]) || ($analyzedOnly && !$p['analyzed'])) {
                 continue;
             }
             if ($category && $p['category'] !== $category) {
