@@ -110,7 +110,7 @@ onBeforeUnmount(() => { while (cleanups.length) cleanups.pop()(); });
             </h1>
 
             <p class="intro mx-auto mt-6 max-w-xl text-base leading-relaxed text-lp-muted sm:text-lg" style="--d: 380ms">
-                Describe your idea in plain English. AiWebBuilder designs, writes and assembles a complete, editable website — ready to publish.
+                Describe your idea in plain English. VibeWeb designs, writes and assembles a complete, editable website — ready to publish.
             </p>
 
             <!-- Prompt box with a slowly rotating gradient border -->
@@ -160,7 +160,7 @@ onBeforeUnmount(() => { while (cleanups.length) cleanups.pop()(); });
                 </div>
                 <div class="float-card float-3 hidden lg:flex" aria-hidden="true">
                     <span class="relative flex size-2.5"><span class="live-ping absolute inset-0 rounded-full bg-emerald-400"></span><span class="relative size-2.5 rounded-full bg-emerald-400"></span></span>
-                    <span class="text-left"><span class="block text-[13px] font-semibold text-lp-fg">Published</span><span class="block text-[11px] text-lp-subtle">lumen.aiwebbuilder.app</span></span>
+                    <span class="text-left"><span class="block text-[13px] font-semibold text-lp-fg">Published</span><span class="block text-[11px] text-lp-subtle">lumen.vibeweb.app</span></span>
                 </div>
             </div>
 

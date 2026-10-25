@@ -573,6 +573,6 @@ class ExportService
             . "• The contact form opens the visitor's email app (or WhatsApp) with their message.\n"
             . ($shop ? "• Shop: this copy has no server, so checkout sends the order by WhatsApp or email.\n"
                 . "  Orders placed on your published site (" . ($project ? url("/s/{$project->slug}") : 'your live link') . ") still arrive in your Orders page.\n" : '')
-            . "\nMade with AiWebBuilder.\n";
+            . "\nMade with VibeWeb.\n";
     }
 }

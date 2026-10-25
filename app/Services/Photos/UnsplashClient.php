@@ -62,7 +62,7 @@ class UnsplashClient implements PhotoSource
             'alt' => mb_strimwidth(trim(implode(' · ', array_filter([(string) ($p['alt_description'] ?? $p['description'] ?? ''), $tags ? implode(', ', array_slice($tags, 0, 6)) : null]))), 0, 300, ''),
             'avg_color' => $p['color'] ?? null,
             'photographer' => $p['user']['name'] ?? null,
-            'photographer_url' => isset($p['user']['links']['html']) ? $p['user']['links']['html'] . '?utm_source=ai_website_builder&utm_medium=referral' : null,
+            'photographer_url' => isset($p['user']['links']['html']) ? $p['user']['links']['html'] . '?utm_source=vibeweb&utm_medium=referral' : null,
         ];
     }
 

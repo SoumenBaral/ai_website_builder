@@ -28,8 +28,8 @@
     @media (prefers-reduced-motion: reduce) { .demo-pill { animation: none; } }
 </style>
 <div class="demo-pill" role="complementary" aria-label="About this demo">
-    <a href="{{ $home }}" class="demo-pill-mark" title="AiWebBuilder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></a>
-    <span class="demo-pill-text">Demo site — built with <strong>AiWebBuilder</strong> in minutes</span>
+    <a href="{{ $home }}" class="demo-pill-mark" title="VibeWeb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></a>
+    <span class="demo-pill-text">Demo site — built with <strong>VibeWeb</strong> in minutes</span>
     <a href="{{ $signup }}" class="demo-pill-cta">Build yours free →</a>
     <button type="button" class="demo-pill-close" aria-label="Hide" onclick="this.parentNode.remove()">✕</button>
 </div>

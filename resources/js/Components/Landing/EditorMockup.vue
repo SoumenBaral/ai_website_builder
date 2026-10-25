@@ -19,7 +19,7 @@ import { buildSteps } from './content';
             </div>
             <div class="mx-auto flex min-w-0 max-w-xs flex-1 items-center justify-center gap-1.5 truncate rounded-md bg-white/[0.04] px-3 py-1 text-[11px] text-zinc-500">
                 <span class="size-1.5 shrink-0 rounded-full bg-emerald-400"></span>
-                aiwebbuilder.app/editor
+                vibeweb.app/editor
             </div>
             <div class="building-chip hidden sm:flex">
                 <Icon name="sparkles" :stroke="1.8" class="size-3" />

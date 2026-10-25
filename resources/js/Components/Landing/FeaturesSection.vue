@@ -52,7 +52,7 @@ import { features, blockNames } from './content';
                                 <div v-else-if="f.key === 'publish'" class="panel p-3">
                                     <div class="flex items-center gap-2 rounded-lg bg-lp-ink/[0.04] px-3 py-2 text-[13px] text-lp-text">
                                         <span class="relative flex size-2"><span class="live-ping absolute inset-0 rounded-full bg-emerald-400"></span><span class="relative size-2 rounded-full bg-emerald-400"></span></span>
-                                        <span class="truncate">lumen.aiwebbuilder.app</span>
+                                        <span class="truncate">lumen.vibeweb.app</span>
                                         <span class="ml-auto rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-500">Live</span>
                                     </div>
                                 </div>
