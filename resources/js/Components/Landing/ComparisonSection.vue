@@ -7,7 +7,7 @@ import { comparison } from './content';
 <template>
     <section class="section relative">
         <div class="mx-auto max-w-5xl px-4 sm:px-6">
-            <SectionHeading eyebrow="Why AiWebBuilder">
+            <SectionHeading eyebrow="Why VibeWeb">
                 Stop waiting weeks. <em>Start in seconds.</em>
             </SectionHeading>
 

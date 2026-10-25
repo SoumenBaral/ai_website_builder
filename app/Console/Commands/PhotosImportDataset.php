@@ -117,7 +117,7 @@ class PhotosImportDataset extends Command
                 'featured' => ($row[$col['photo_featured']] ?? 'f') === 't',
                 'description' => trim((string) ($row[$col['ai_description']] ?? '')) ?: trim((string) ($row[$col['photo_description']] ?? '')),
                 'photographer' => trim(($row[$col['photographer_first_name']] ?? '') . ' ' . ($row[$col['photographer_last_name']] ?? '')),
-                'photographer_url' => !empty($row[$col['photographer_username']]) ? 'https://unsplash.com/@' . $row[$col['photographer_username']] . '?utm_source=ai_website_builder&utm_medium=referral' : null,
+                'photographer_url' => !empty($row[$col['photographer_username']]) ? 'https://unsplash.com/@' . $row[$col['photographer_username']] . '?utm_source=vibeweb&utm_medium=referral' : null,
             ];
         }
         fclose($fh);

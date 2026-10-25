@@ -28,7 +28,7 @@ function next() {
         <div class="mx-auto max-w-6xl px-4 sm:px-6">
             <SectionHeading eyebrow="Showcase">
                 One sentence. <em>A whole website.</em>
-                <template #lead>Pick a prompt and see the kind of site AiWebBuilder generates — layout, copy, colors and all.</template>
+                <template #lead>Pick a prompt and see the kind of site VibeWeb generates — layout, copy, colors and all.</template>
             </SectionHeading>
 
             <div data-reveal style="--d: 100ms" class="mt-12 grid gap-6 sm:mt-16 lg:grid-cols-[minmax(0,20rem)_1fr] lg:gap-10">

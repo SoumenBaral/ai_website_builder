@@ -48,7 +48,7 @@ const { user, canLogin, canRegister } = useLandingLinks();
 
         <div class="border-t border-lp-ink/[0.07]">
             <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-5 sm:px-6">
-                <p class="text-xs text-lp-subtle">&copy; {{ new Date().getFullYear() }} AiWebBuilder. All rights reserved.</p>
+                <p class="text-xs text-lp-subtle">&copy; {{ new Date().getFullYear() }} VibeWeb. All rights reserved.</p>
                 <ThemeToggle />
             </div>
         </div>

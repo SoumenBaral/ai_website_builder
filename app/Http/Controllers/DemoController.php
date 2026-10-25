@@ -30,7 +30,7 @@ class DemoController extends Controller
         return fn (string $anchor, string $slug) => route('demo.item', [$anchor, $slug]);
     }
 
-    /** Adds the "Built with AiWebBuilder" pill. */
+    /** Adds the "Built with VibeWeb" pill. */
     private function respond(string $html)
     {
         $pill = view('export.partials.demo-pill', ['signup' => route('register'), 'home' => url('/')])->render();

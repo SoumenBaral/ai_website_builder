@@ -61,7 +61,7 @@ useDocumentTheme();
                 </main>
 
                 <footer class="flex items-center justify-between gap-4 py-6 text-xs text-lp-subtle">
-                    <span>&copy; {{ new Date().getFullYear() }} AiWebBuilder</span>
+                    <span>&copy; {{ new Date().getFullYear() }} VibeWeb</span>
                     <Link href="/" class="transition hover:text-lp-fg sm:hidden">Back to home</Link>
                 </footer>
             </div>

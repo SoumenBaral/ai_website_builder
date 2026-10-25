@@ -32,7 +32,7 @@ onBeforeUnmount(() => clearInterval(timer));
 
 <!-- Always dark (`force-dark`) so the brand moment looks the same in both themes. -->
 <template>
-    <aside class="force-dark sticky top-0 h-screen p-3" aria-label="What you can build with AiWebBuilder">
+    <aside class="force-dark sticky top-0 h-screen p-3" aria-label="What you can build with VibeWeb">
         <div class="panel-shell relative flex h-full flex-col overflow-hidden rounded-[1.75rem] px-10 py-10 xl:px-14 xl:py-12">
             <div class="pointer-events-none absolute inset-0" aria-hidden="true">
                 <div class="panel-grid absolute inset-0"></div>

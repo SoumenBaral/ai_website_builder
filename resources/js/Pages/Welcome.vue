@@ -34,8 +34,8 @@ function scrollToSection(id) {
 </script>
 
 <template>
-    <Head title="AiWebBuilder — Build stunning websites with AI in seconds">
-        <meta name="description" content="Describe your website in plain English and AiWebBuilder designs, writes and assembles it in seconds. Edit visually, then publish in one click." />
+    <Head title="VibeWeb — Build stunning websites with AI in seconds">
+        <meta name="description" content="Describe your website in plain English and VibeWeb designs, writes and assembles it in seconds. Edit visually, then publish in one click." />
     </Head>
 
     <div ref="root" class="landing relative min-h-screen overflow-x-clip font-sans antialiased" :data-theme="theme">
