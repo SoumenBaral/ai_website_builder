@@ -96,13 +96,46 @@ final class PhotoTopics
         ],
     ];
 
+    /**
+     * Single-keyword topics for the Unsplash dataset import, whose keywords are mostly one
+     * word ("doctor", "laptop"): they catch what the descriptive topics above miss.
+     */
+    public const KEYWORD_TOPICS = [
+        'business' => ['office', 'laptop desk', 'meeting', 'handshake', 'teamwork', 'coworking', 'workspace', 'entrepreneur', 'finance', 'skyscraper'],
+        'food' => ['burger', 'steak', 'wine', 'biryani', 'rice', 'noodles', 'seafood', 'chocolate', 'fruit', 'vegetables', 'kebab', 'soup'],
+        'fashion' => ['sneaker', 'handbag', 'sunglasses', 'suit', 'hoodie', 'saree', 'dress', 'jewelry', 'watch', 'boutique', 'jeans'],
+        'beauty' => ['makeup', 'skincare', 'salon', 'spa', 'cosmetics', 'barber', 'perfume', 'manicure', 'hairstyle'],
+        'health' => ['doctor', 'hospital', 'medical', 'nurse', 'pharmacy', 'dentist', 'stethoscope', 'clinic', 'therapy', 'medicine'],
+        'fitness' => ['gym', 'workout', 'football', 'cricket', 'boxing', 'running', 'yoga', 'athlete', 'swimming', 'cycling', 'basketball'],
+        'nature' => ['waterfall', 'sunset', 'forest', 'beach', 'flowers', 'garden', 'river', 'island', 'autumn', 'snow'],
+        'travel' => ['hotel', 'airport', 'passport', 'suitcase', 'cruise', 'temple', 'landmark', 'camping', 'road trip'],
+        'home' => ['house', 'architecture', 'plumber', 'cleaning', 'keys', 'apartment', 'furniture', 'renovation', 'bathroom', 'kitchen'],
+        'tech' => ['computer', 'coding', 'laptop', 'technology', 'robot', 'smartphone', 'circuit', 'server', 'keyboard', 'software', 'gaming', 'drone', 'camera'],
+        'education' => ['classroom', 'student', 'book', 'library', 'school', 'university', 'graduation', 'study', 'science', 'piano', 'teacher'],
+        'events' => ['birthday', 'conference', 'fireworks', 'party', 'concert', 'festival', 'celebration', 'wedding', 'stage', 'microphone'],
+        'animals' => ['dog', 'cat', 'puppy', 'kitten', 'horse', 'bird', 'veterinarian', 'parrot'],
+        'shop' => ['shopping', 'store', 'market', 'delivery', 'warehouse', 'package', 'checkout', 'grocery', 'retail', 'cart'],
+        'backgrounds' => ['texture', 'gradient', 'pattern', 'marble', 'wood', 'abstract', 'minimal', 'wall', 'paper'],
+        'people' => ['headshot', 'businesswoman', 'businessman', 'chef', 'team', 'portrait', 'woman', 'man', 'girl', 'boy', 'family', 'elderly'],
+        'services' => ['taxi', 'sewing', 'laundry', 'solar panel', 'factory', 'mechanic', 'construction', 'farmer', 'fishing', 'security', 'truck', 'printing'],
+        'creative' => ['designer', 'tablet', 'painting', 'pottery', 'photographer', 'dancer', 'studio', 'musician', 'art'],
+        'charity' => ['volunteer', 'donation', 'community', 'children', 'helping', 'village'],
+    ];
+
     /** @return array<int, array{topic: string, category: string}> */
-    public static function all(): array
+    public static function all(bool $withKeywordTopics = false): array
     {
         $out = [];
         foreach (self::TOPICS as $category => $topics) {
             foreach ($topics as $topic) {
                 $out[] = ['topic' => $topic, 'category' => $category];
+            }
+        }
+        if ($withKeywordTopics) {
+            foreach (self::KEYWORD_TOPICS as $category => $topics) {
+                foreach ($topics as $topic) {
+                    $out[] = ['topic' => $topic, 'category' => $category];
+                }
             }
         }
 
