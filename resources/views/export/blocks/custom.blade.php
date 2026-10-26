@@ -19,12 +19,12 @@
                 @php $elType = $el['type'] ?? ''; @endphp
 
                 @if($elType === 'heading')
-                    <h2 class="{{ $headingSizes[$el['size'] ?? '2xl'] ?? 'text-2xl' }} {{ $alignMap[$el['align'] ?? 'left'] ?? '' }} font-bold" style="font-family: var(--font-heading);">
+                    <h2 class="{{ $headingSizes[$el['size'] ?? '2xl'] ?? 'text-2xl' }} {{ $alignMap[$el['align'] ?? 'center'] ?? 'text-center' }} font-bold" style="font-family: var(--font-heading);">
                         {{ $el['text'] ?? '' }}
                     </h2>
 
                 @elseif($elType === 'text')
-                    <p class="{{ $textSizes[$el['size'] ?? 'base'] ?? 'text-base' }} {{ $alignMap[$el['align'] ?? 'left'] ?? '' }} opacity-80 leading-relaxed" style="font-family: var(--font-body);">
+                    <p class="{{ $textSizes[$el['size'] ?? 'base'] ?? 'text-base' }} {{ $alignMap[$el['align'] ?? 'center'] ?? 'text-center' }} opacity-80 leading-relaxed" style="font-family: var(--font-body);">
                         {{ $el['text'] ?? '' }}
                     </p>
 

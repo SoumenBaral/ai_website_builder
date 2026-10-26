@@ -54,7 +54,7 @@ return [
     'max_tokens' => [
         'generate' => (int) env('AI_GENERATE_MAX_TOKENS', 14000),
         'edit_site' => (int) env('AI_EDIT_SITE_MAX_TOKENS', 14000),
-        'edit_section' => (int) env('AI_EDIT_SECTION_MAX_TOKENS', 4000),
+        'edit_section' => (int) env('AI_EDIT_SECTION_MAX_TOKENS', 8000),
     ],
 
     // Automatic retries when the model output is truncated or unusable.

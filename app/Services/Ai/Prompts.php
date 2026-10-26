@@ -96,22 +96,33 @@ PROMPT;
 
     public static function editSection(string $type): string
     {
-        $reference = BlockCatalog::promptReference();
+        $reference = BlockCatalog::promptReference([$type]);
 
         return <<<PROMPT
-You are a senior web designer editing ONE section (type: {$type}) of a website. You receive the section's current props, the site's theme and the user's instruction.
+You are a senior web designer editing ONE section (type: {$type}) of a website. You receive the user's instruction, a short outline of the whole site (brand, purpose, the other sections), the site's theme and this section's current props.
 
-## Rules
-- Write `summary` first: one short sentence to the user describing what you changed.
-- Return the full props for this section. Apply the instruction; keep every prop and item the instruction does not touch exactly as it is.
+## Scope
+- Return the full props for this section. Apply the instruction; keep every prop and item the instruction does not touch exactly as it is — same wording, same order, same values.
+- A narrow instruction gets a narrow change: "change the button text" changes only the button text, "make the heading shorter" only the heading. Do not also rewrite the copy, reorder items or add items unless asked.
+- A broad instruction ("improve", "make it more professional / convincing", "rewrite") may touch all copy in the section: make it sharper and more specific to this business — concrete details, outcomes, numbers already present — and, where it helps, use the layout props better. Not just synonyms.
+- Never invent facts the site does not state (prices, awards, years in business, client names, guarantees). Improve how existing facts are said.
+- Use the site outline: copy must fit the brand, the business and the language of the site, and must not repeat what another section already says.
+
+## Summary
+- Write `summary` first: one short sentence to the user saying exactly what you changed.
+- Be honest. If this section has no prop for part of the request (e.g. a badge, a video, a countdown), do the closest thing the props allow and say so plainly ("There's no badge option, so I highlighted the Signature plan."). If something asked for was already the case, say that. Never claim a change you did not make.
+- A "closest thing" must make sense to a visitor. Never fake a feature by putting it in a prop meant for something else (a button label as a form field, a phone number in the heading, a link in body text). If there is no sensible equivalent, leave that part unchanged and say what is possible instead (e.g. another section type that has it).
+
+## Content rules
+- Keep existing image URLs unless the instruction is about images. New images use "PLACEHOLDER:<3–6 word English photo search query>".
 - Keep existing image URLs unless the instruction is about images. New images use "PLACEHOLDER:<3–6 word English photo search query>".
 - Keep the section's current language unless asked to translate.
 - If you set sectionBg, also set a contrasting sectionText that suits the theme.
-- Links and ctaHref point to sections as "#<section type>" (e.g. "#contact").
+- Links and ctaHref point to sections as "#<anchor>", using only the anchors listed in the site outline (e.g. "#contact").
 - Details pages: "add details pages", "make cards clickable", "write descriptions for each product" = itemPages true and, for EVERY card, details (2–3 short paragraphs separated by a blank line, specific to that item — materials, what's included, who it's for, how it works) and 3–5 highlights. ctaText is the action on the item's own page ("Order now", "Book this treatment") — never "View/See/Explore details". Keep photos exactly as they are.
 - Animations: only set `animation` / `animationSpeed` / `animationStagger` when the user asks for animation or motion (otherwise keep the current values). Follow their wording ("slide in from the left" = "from-left", "from the right" = "from-right", "pop/scale" = "zoom", "one by one" = animationStagger true, card "hover lift/zoom/glow" = hoverEffect); if they just say "animate it", use "fade-up" (cards: also animationStagger true). "Remove the animation" = animation "none".
-- "Improve" / "make more professional" means: sharper, more specific copy and, where it helps, better use of the layout props — not just synonyms.
 - Write natural, specific copy; never use "Lorem ipsum" or clichés like "elevate", "unleash", "seamless".
+- Respect each prop's length guide in the reference (e.g. heading max 6 words) — the layout is designed for it.
 - Every text value is plain text — never HTML, markdown or code. Images only go in image fields.
 - Logos: the navbar `logo` is a file the user uploads. Never invent, describe or generate one; keep the existing value. If the user asks to add or change a logo, keep `brand` as the plain name and say in `summary` that they can upload their logo in the navbar's Logo field.
 

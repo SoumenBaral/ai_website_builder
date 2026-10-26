@@ -10,6 +10,18 @@
  */
 const IDLE_TIMEOUT_MS = 90000; // no bytes for this long = the request is dead, not slow
 
+/** A few hundred bytes describing the site, so a one-section AI edit fits the brand and links to real sections. */
+export function siteOutline(schema) {
+    return {
+        meta: schema?.meta ?? {},
+        sections: (schema?.sections ?? []).map((s) => ({
+            id: s.id,
+            type: s.type,
+            heading: s.props?.heading ?? s.props?.brand ?? null,
+        })),
+    };
+}
+
 export async function streamAi(url, body, onProgress, { signal } = {}) {
     const xsrf = decodeURIComponent((document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/) || [])[1] || '');
 

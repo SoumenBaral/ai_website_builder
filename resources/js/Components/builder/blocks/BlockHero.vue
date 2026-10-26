@@ -33,24 +33,33 @@ const heightClass = computed(() => ({
     lg: 'min-h-[500px]',
     full: 'min-h-screen',
 }[props.minHeight] || 'min-h-[500px]'));
+// Split layout: the minimum height applies from tablets up (phones stack photo and text).
+const splitHeightClass = computed(() => ({
+    sm: 'md:min-h-[300px]',
+    md: 'md:min-h-[400px]',
+    lg: 'md:min-h-[500px]',
+    full: 'md:min-h-screen',
+}[props.minHeight] || 'md:min-h-[500px]'));
 </script>
 
 <template>
+    <!-- Published twin: resources/views/export/blocks/hero.blade.php — keep the two in step. -->
     <!-- Split layout: image on one side, text on other -->
-    <section v-if="isSplit" class="flex items-stretch" :class="heightClass">
+    <!-- Phones: photo on top, text below (no forced height). Tablets and up: side by side. -->
+    <section v-if="isSplit" class="flex flex-col md:flex-row items-stretch" :class="splitHeightClass">
         <!-- Image side -->
         <div
-            :class="layout === 'split-left' ? 'order-1' : 'order-2'"
-            class="hidden md:block w-1/2 bg-cover"
+            :class="layout === 'split-left' ? 'md:order-1' : 'md:order-2'"
+            class="order-1 block w-full h-80 sm:h-[28rem] md:h-auto md:w-1/2 md:aspect-[5/4] bg-cover"
             :style="image ? { backgroundImage: `url(${image})`, backgroundPosition: '50% 18%' } : { background: 'var(--secondary, #e2e8f0)' }"
         ></div>
         <!-- Text side -->
         <div
-            :class="layout === 'split-left' ? 'order-2' : 'order-1'"
-            class="w-full md:w-1/2 flex items-center"
+            :class="layout === 'split-left' ? 'md:order-2' : 'md:order-1'"
+            class="order-2 w-full md:w-1/2 flex items-center"
             :style="{ background: 'var(--bg)', color: 'var(--text)' }"
         >
-            <div class="w-full max-w-xl mx-auto px-8 py-16 lg:px-12" :class="textAlign">
+            <div class="w-full max-w-xl mx-auto px-6 py-12 sm:px-8 md:py-16 lg:px-12" :class="textAlign">
                 <h1
                     class="text-4xl md:text-5xl font-bold mb-4 leading-tight"
                     :style="{ fontFamily: 'var(--font-heading)' }"

@@ -14,12 +14,18 @@ use Illuminate\Support\Facades\Log;
  * Auth is the `pk_live_…` user key in the `x-api-key` header. Models: `opus`
  * (Claude Opus), `puku-ai-2.8`, `puku-ai-2.7`.
  *
- * JSON is enforced with Anthropic structured outputs. Because a gateway may lag
+ * JSON is requested with Anthropic structured outputs. Because a gateway may lag
  * behind the upstream API, the request is tried in three modes, falling back on
  * a 400 that names the unsupported field:
  *   1. `output_config.format`  (current GA shape)
  *   2. `output_format` + beta header (older shape)
- *   3. prompt-only: instruct JSON and prefill the reply with "{"
+ *   3. prompt-only: no schema field at all
+ *
+ * The CLI gateway silently drops both `system` and the structured-output fields
+ * (it runs its own system prompt), so the instructions and the JSON schema always
+ * travel at the top of the first user turn, and the reply is cut down to the JSON
+ * object in case the model wraps it in prose or a code fence. No "{" prefill: the
+ * gateway's models repeat it, which corrupts the JSON.
  */
 class PukuProvider implements ChatProvider
 {
@@ -101,6 +107,12 @@ class PukuProvider implements ChatProvider
         $headers = [];
         $prefill = '';
 
+        // The gateway ignores `system` and the schema fields, so the model only sees what is in the turns.
+        $instructions = ($system ? $system . "\n\n" : '')
+            . "Respond with a single JSON object and nothing else — no prose, no markdown fences, no questions. It must match this JSON schema exactly:\n"
+            . json_encode($request->schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $messages = self::prependToFirstUserTurn($messages, $instructions);
+
         $body = [
             'model' => $request->model,
             'max_tokens' => $request->maxTokens,
@@ -115,24 +127,59 @@ class PukuProvider implements ChatProvider
         } elseif ($mode === 'output_format') {
             $body['output_format'] = $format;
             $headers['anthropic-beta'] = 'structured-outputs-2025-11-13';
-        } else {
-            // No schema enforcement available: ask firmly and start the answer for the model.
-            $system = ($system ? $system . "\n\n" : '')
-                . "Respond with a single JSON object and nothing else — no prose, no markdown fences. It must match this JSON schema exactly:\n"
-                . json_encode($request->schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            $prefill = '{';
-            $messages[] = ['role' => 'assistant', 'content' => $prefill];
-            $body['messages'] = $messages;
         }
 
-        if ($system !== null) {
-            $body['system'] = $system;
-        }
         if ($stream) {
             $body['stream'] = true;
         }
 
         return [$body, $headers, $prefill];
+    }
+
+    /** Put $text ahead of the first user turn's content (string or content blocks). */
+    private static function prependToFirstUserTurn(array $messages, string $text): array
+    {
+        foreach ($messages as $i => $message) {
+            if ($message['role'] !== 'user') {
+                continue;
+            }
+            $messages[$i]['content'] = is_string($message['content'])
+                ? $text . "\n\n---\n\n" . $message['content']
+                : [['type' => 'text', 'text' => $text], ...$message['content']];
+
+            return $messages;
+        }
+
+        return [['role' => 'user', 'content' => $text], ...$messages];
+    }
+
+    /**
+     * The JSON object inside a reply that may carry prose or ```json fences around it.
+     * Returns the text unchanged when no decodable object is found, so the caller's
+     * validation (and retry) still sees what the model actually said.
+     */
+    public static function extractJson(string $text): string
+    {
+        $trimmed = trim($text);
+        if ($trimmed === '' || json_decode($trimmed) !== null) {
+            return $trimmed === '' ? $text : $trimmed;
+        }
+
+        if (preg_match('/```(?:json)?\s*(\{.*\})\s*```/s', $trimmed, $m) && is_array(json_decode($m[1], true))) {
+            return $m[1];
+        }
+
+        $end = strrpos($trimmed, '}');
+        $offset = 0;
+        while ($end !== false && ($start = strpos($trimmed, '{', $offset)) !== false && $start < $end) {
+            $candidate = substr($trimmed, $start, $end - $start + 1);
+            if (is_array(json_decode($candidate, true))) {
+                return $candidate;
+            }
+            $offset = $start + 1;
+        }
+
+        return $text;
     }
 
     /** OpenAI-style content parts → Anthropic content blocks (strings pass through). */
@@ -184,7 +231,7 @@ class PukuProvider implements ChatProvider
         }
 
         return new ChatResult(
-            $prefill . $text,
+            self::extractJson($prefill . $text),
             $this->finish($json['stop_reason'] ?? null),
             ['input' => $json['usage']['input_tokens'] ?? null, 'output' => $json['usage']['output_tokens'] ?? null],
         );
@@ -254,7 +301,7 @@ class PukuProvider implements ChatProvider
             $handle(trim($pending));
         }
 
-        return new ChatResult($buffer, $this->finish($finish), $usage);
+        return new ChatResult(self::extractJson($buffer), $this->finish($finish), $usage);
     }
 
     private function finish(?string $stopReason): ?string

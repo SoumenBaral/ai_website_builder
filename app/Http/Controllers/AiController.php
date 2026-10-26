@@ -70,6 +70,9 @@ class AiController extends Controller
             'section.type' => 'required|string',
             'theme' => 'required|array',
             'instruction' => 'required|string|max:1000',
+            'site' => 'nullable|array',
+            'site.meta' => 'nullable|array',
+            'site.sections' => 'nullable|array|max:60',
         ]);
 
         return $this->respond($request, fn () => $ai->editSection(
@@ -77,6 +80,7 @@ class AiController extends Controller
             $request->instruction,
             $request->theme,
             $request->user()->id,
+            $request->input('site'),
         ), allowStream: false);
     }
 

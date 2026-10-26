@@ -1,7 +1,12 @@
-<section class="py-16 px-6" style="background-color: var(--bg); color: var(--text); font-family: var(--font-body);">
-    <div class="max-w-6xl mx-auto">
+{{-- Mirrors resources/js/Components/builder/blocks/BlockStats.vue: keep the two in step. --}}
+<section class="relative py-16 px-6 overflow-hidden" style="background-color: var(--bg); color: var(--text); font-family: var(--font-body);">
+    @if(!empty($props['image']))
+        <img {!! \App\Support\SiteHtml::img($props['image'], '100vw') !!} alt="" loading="lazy" decoding="async" class="absolute inset-0 w-full h-full object-cover">
+        <div class="absolute inset-0 bg-black/60"></div>
+    @endif
+    <div class="relative z-10 max-w-6xl mx-auto">
         @if(!empty($props['heading']))
-            <h2 class="text-3xl font-bold text-center mb-12" style="font-family: var(--font-heading);">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-12" style="font-family: var(--font-heading);">
                 {{ $props['heading'] }}
             </h2>
         @endif
@@ -13,11 +18,11 @@
         <div class="grid {{ $gridClass }} gap-8">
             @if(!empty($props['items']))
                 @foreach($props['items'] as $item)
-                    <div class="text-center">
-                        <div class="text-5xl font-bold mb-2" style="color: var(--primary); font-family: var(--font-heading);">
+                    <div class="text-center p-6">
+                        <div class="text-4xl md:text-5xl font-bold mb-2" style="color: var(--primary); font-family: var(--font-heading);">
                             {{ $item['value'] ?? '' }}
                         </div>
-                        <div class="text-sm uppercase tracking-wide opacity-70">
+                        <div class="text-sm uppercase tracking-wider opacity-60 font-medium">
                             {{ $item['label'] ?? '' }}
                         </div>
                     </div>

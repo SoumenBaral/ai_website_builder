@@ -103,8 +103,11 @@ it('sends an Anthropic Messages request with the pk_live key and structured outp
             && $body['model'] === 'opus'
             && $body['max_tokens'] === 100
             && $body['temperature'] === 0.2
-            && $body['system'] === 'Be terse.'                       // system prompt lifted out of messages
-            && $body['messages'] === [['role' => 'user', 'content' => 'ping']]
+            && !isset($body['system'])                               // the gateway drops `system`…
+            && count($body['messages']) === 1
+            && str_starts_with($body['messages'][0]['content'], 'Be terse.') // …so it rides in the user turn
+            && str_contains($body['messages'][0]['content'], 'JSON schema')
+            && str_ends_with($body['messages'][0]['content'], 'ping')
             && $body['output_config']['format']['type'] === 'json_schema'
             && $body['output_config']['format']['schema']['additionalProperties'] === false
             && !isset($body['stream']);
@@ -134,16 +137,26 @@ it('reports truncation as "length" so the service can retry', function () {
     expect(pukuProvider()->complete(healthRequest())->truncated())->toBeTrue();
 });
 
+it('cuts the JSON object out of a reply wrapped in prose or code fences', function (string $text) {
+    Http::fake([PUKU_URL => Http::response(pukuMessage($text))]);
+
+    expect(json_decode(pukuProvider()->complete(healthRequest())->content, true))->toBe(['ok' => true]);
+})->with([
+    'code fence' => ["Here you go:\n```json\n{\"ok\": true}\n```"],
+    'prose around it' => ["Sure! {\"ok\": true} Let me know if you need more."],
+    'doubled opening brace' => ['{{"ok": true}'],
+]);
+
 it('falls back to the beta output_format, then to prompt-only JSON, when the gateway rejects structured outputs', function () {
     Http::fake([PUKU_URL => Http::sequence()
         ->push(['error' => ['type' => 'invalid_request_error', 'message' => 'output_config: Extra inputs are not permitted']], 400)
         ->push(['error' => ['type' => 'invalid_request_error', 'message' => 'output_format: Extra inputs are not permitted']], 400)
-        ->push(pukuMessage('"ok":true}')),
+        ->push(pukuMessage('{"ok":true}')),
     ]);
 
     $result = pukuProvider()->complete(healthRequest());
 
-    expect($result->content)->toBe('{"ok":true}'); // the "{" prefill is re-attached
+    expect($result->content)->toBe('{"ok":true}');
 
     $sent = collect(Http::recorded())->map(fn ($pair) => $pair[0]);
     expect($sent)->toHaveCount(3)
@@ -152,8 +165,8 @@ it('falls back to the beta output_format, then to prompt-only JSON, when the gat
         ->and($sent[1]->hasHeader('anthropic-beta', 'structured-outputs-2025-11-13'))->toBeTrue()
         ->and($sent[2]->data())->not->toHaveKey('output_config')
         ->and($sent[2]->data())->not->toHaveKey('output_format')
-        ->and($sent[2]->data()['messages'][1])->toBe(['role' => 'assistant', 'content' => '{'])
-        ->and($sent[2]->data()['system'])->toContain('JSON schema');
+        ->and($sent[2]->data()['messages'])->toHaveCount(1) // no "{" prefill
+        ->and($sent[2]->data()['messages'][0]['content'])->toContain('JSON schema');
 });
 
 it('classifies Puku errors so the caller knows whether to retry', function (int $status, array $error, string $kind) {
@@ -239,7 +252,7 @@ describe('website generation on Puku', function () {
         expect(AiGeneration::first())->model->toBe('opus')->output_tokens->toBe(2500);
 
         Http::assertSent(fn (Request $r) => $r->data()['model'] === 'opus'
-            && str_contains($r->data()['system'], 'conversion copywriter')
+            && str_contains($r->data()['messages'][0]['content'], 'conversion copywriter')
             && $r->data()['output_config']['format']['schema']['properties']['sections']['type'] === 'array');
     });
 
@@ -300,5 +313,38 @@ describe('website generation on Puku', function () {
             ->assertJsonPath('section.id', 'blk_features_42')
             ->assertJsonPath('section.props.heading', 'New headline');
         Http::assertSent(fn (Request $r) => $r->data()['model'] === 'puku-ai-2.8');
+    });
+
+    it('gives a section edit the site outline and only that section type\'s reference', function () {
+        Http::fake([PUKU_URL => Http::response(pukuMessage([
+            'summary' => 'Shortened the heading.',
+            'props' => ['heading' => 'Why us', 'items' => [], 'columns' => 3, 'align' => 'center', 'image' => null, 'imageRadius' => null, 'imageShadow' => null, 'imageBorder' => null, 'sectionBg' => null, 'sectionText' => null],
+        ]))]);
+
+        $this->actingAs($this->user)->postJson(route('ai.editSection'), [
+            'section' => ['id' => 'blk_features_42', 'type' => 'features', 'props' => ['heading' => 'Why couples choose us', 'items' => []]],
+            'theme' => $this->page->schema['theme'],
+            'instruction' => 'Shorter heading',
+            'site' => [
+                'meta' => ['title' => 'Lumen Studio — Wedding Photography', 'language' => 'en'],
+                'sections' => [
+                    ['id' => 'blk_navbar_1', 'type' => 'navbar', 'heading' => 'Lumen Studio'],
+                    ['id' => 'blk_hero_1', 'type' => 'hero', 'heading' => 'Moments, beautifully kept'],
+                    ['id' => 'blk_features_42', 'type' => 'features', 'heading' => 'Why couples choose us'],
+                    ['id' => 'blk_contact_1', 'type' => 'contact', 'heading' => "Let's plan your day"],
+                ],
+            ],
+        ])->assertOk()->assertJsonPath('summary', 'Shortened the heading.');
+
+        Http::assertSent(function (Request $r) {
+            $prompt = $r->data()['messages'][0]['content'];
+
+            return str_contains($prompt, 'Brand: Lumen Studio')
+                && str_contains($prompt, '- hero (#home): "Moments, beautifully kept"')
+                && str_contains($prompt, '- contact (#contact)')
+                && str_contains($prompt, 'features (#features): "Why couples choose us"  ← the section you are editing')
+                && str_contains($prompt, '- features: ')     // its own reference line…
+                && !str_contains($prompt, '- pricing: ');    // …but not every other block type's
+        });
     });
 });

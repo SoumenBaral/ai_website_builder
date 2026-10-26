@@ -39,8 +39,10 @@ provide('newOrders', props.newOrders);
 /* ---------- Layout state ---------- */
 const devices = [
     { key: 'desktop', width: '100%', icon: 'desktop', label: 'Desktop' },
-    { key: 'tablet', width: '768px', icon: 'tablet', label: 'Tablet' },
-    { key: 'mobile', width: '390px', icon: 'phone', label: 'Mobile' },
+    // Device width + the frame's side borders (.frame--tablet 5px, .frame--mobile 6px), so the
+    // site inside gets exactly 768px / 390px — the widths its breakpoints are designed around.
+    { key: 'tablet', width: 'calc(768px + 10px)', icon: 'tablet', label: 'Tablet' },
+    { key: 'mobile', width: 'calc(390px + 12px)', icon: 'phone', label: 'Mobile' },
 ];
 const device = ref('desktop');
 const previewWidth = computed(() => devices.find((d) => d.key === device.value).width);
@@ -356,7 +358,7 @@ const fontLink = computed(() => {
                         <!-- The user's website — styled only by its own theme -->
                         <div
                             class="site-canvas preview-canvas"
-                            :class="{ 'preview-mobile': device === 'mobile', 'preview-tablet': device === 'tablet' }"
+                            :class="{ 'is-device': device !== 'desktop', 'preview-mobile': device === 'mobile', 'preview-tablet': device === 'tablet' }"
                             :style="themeVars"
                         >
                             <BlockRenderer
@@ -522,61 +524,18 @@ const fontLink = computed(() => {
 
 <style>
 /*
-  Force responsive layouts inside the editor preview canvas.
-  Tailwind's md:/lg: breakpoints read the viewport, not the container,
-  so when we shrink the canvas to 390px or 768px we override the
-  multi-column grids back to single-column.
+  Tablet / mobile preview: the canvas is the `site` container, and the build turns every
+  sm:/md:/lg: rule into a container query for it (see postcss.config.js). Blocks therefore
+  respond to the preview width exactly like the published site does on a real device.
 */
-.preview-mobile .grid.md\:grid-cols-2,
-.preview-mobile .grid.md\:grid-cols-3,
-.preview-mobile .grid.md\:grid-cols-4,
-.preview-mobile .grid.lg\:grid-cols-3,
-.preview-mobile .grid.lg\:grid-cols-4,
-.preview-mobile .grid.sm\:grid-cols-2 {
-    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+.site-canvas.is-device {
+    container: site / inline-size;
 }
-.preview-mobile h1.text-4xl.md\:text-6xl,
-.preview-mobile h1.text-4xl.md\:text-5xl {
-    font-size: 1.875rem !important;
-    line-height: 2.25rem !important;
-}
-.preview-mobile .md\:text-xl {
-    font-size: 1rem !important;
-}
-.preview-mobile .flex-row {
-    flex-direction: column !important;
-}
-.preview-mobile nav .hidden.md\:flex {
-    display: none !important;
-}
-/* Split layouts (e.g. hero image + text) collapse to a single column like on a real phone */
-.preview-mobile .hidden.md\:block,
-.preview-mobile .hidden.md\:flex,
-.preview-mobile .hidden.lg\:block {
-    display: none !important;
-}
-.preview-mobile .md\:w-1\/2,
-.preview-mobile .md\:w-2\/3,
-.preview-mobile .md\:w-1\/3 {
-    width: 100% !important;
-}
-.preview-mobile .md\:text-5xl,
-.preview-mobile .md\:text-6xl {
-    font-size: 2.25rem !important;
-    line-height: 2.5rem !important;
-}
-.preview-mobile .lg\:px-12 {
-    padding-left: 1.5rem !important;
-    padding-right: 1.5rem !important;
-}
-
-/* Tablet: 2 cols max instead of 3+ */
-.preview-tablet .grid.md\:grid-cols-3,
-.preview-tablet .grid.lg\:grid-cols-3 {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-}
-.preview-tablet .grid.md\:grid-cols-4,
-.preview-tablet .grid.lg\:grid-cols-4 {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+/* Browsers give contenteditable text overflow-wrap: break-word, so in the editor a long word
+   ("2,500" in a narrow stat, an email address) wrapped where the published page keeps it on
+   one line. Use the page's own wrapping rules instead. */
+.site-canvas [contenteditable='true'] {
+    overflow-wrap: inherit;
+    line-break: inherit;
 }
 </style>

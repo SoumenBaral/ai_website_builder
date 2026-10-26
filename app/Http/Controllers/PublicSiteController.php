@@ -84,7 +84,9 @@ class PublicSiteController extends Controller
         $etag = '"' . md5($html) . '"';
         $headers = [
             'Content-Type' => 'text/html; charset=utf-8',
-            'Cache-Control' => 'public, max-age=300, s-maxage=86400, stale-while-revalidate=86400',
+            // Revalidate on every visit (a 304 via the ETag costs almost nothing) so an owner who just
+            // edited the site never sees a stale copy; the server-side page cache does the heavy lifting.
+            'Cache-Control' => 'public, no-cache',
             'ETag' => $etag,
             'Last-Modified' => ($project->homePage?->updated_at ?? $project->updated_at)->toRfc7231String(),
             'Vary' => 'Accept-Encoding',

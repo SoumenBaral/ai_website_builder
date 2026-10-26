@@ -59,6 +59,26 @@ final class SiteHtml
     }
 
     /** Plain text with blank lines → escaped <p> elements. */
+    /**
+     * Inline CSS for imageRadius / imageShadow / imageBorder — the same look the editor
+     * gets from useImageStyle.js (Tailwind rounded-* / shadow-* / border classes).
+     */
+    public static function imageStyle(array $props): string
+    {
+        $radius = ['none' => '0', 'sm' => '0.125rem', 'md' => '0.375rem', 'lg' => '0.5rem', 'xl' => '0.75rem', 'full' => '9999px'][$props['imageRadius'] ?? ''] ?? null;
+        $shadow = [
+            'sm' => '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+            'md' => '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+            'lg' => '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+            'xl' => '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+        ][$props['imageShadow'] ?? ''] ?? null;
+        $border = ['thin' => '1px solid #e5e7eb', 'thick' => '2px solid #d1d5db'][$props['imageBorder'] ?? ''] ?? null;
+
+        return ($radius !== null ? "border-radius: {$radius};" : '')
+            . ($shadow !== null ? " box-shadow: {$shadow};" : '')
+            . ($border !== null ? " border: {$border};" : '');
+    }
+
     public static function paragraphs(mixed $text, string $class = ''): string
     {
         if (!is_string($text) || trim($text) === '') {

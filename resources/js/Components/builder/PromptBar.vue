@@ -6,7 +6,7 @@ import { BLOCK_TYPES } from '@/schema/defaults.js';
 import Icon from '@/Components/Landing/Icon.vue';
 import { showcase } from '@/Components/Landing/content';
 import axios from 'axios';
-import { streamAi } from './aiStream';
+import { streamAi, siteOutline } from './aiStream';
 import { useToast } from './useToast';
 import { useLogoStudio } from './useLogoStudio';
 
@@ -133,6 +133,7 @@ async function submit() {
                 section: selectedBlock.value,
                 theme: editor.schema.theme,
                 instruction: prompt.value,
+                site: siteOutline(editor.schema),
             });
             if (!editor.updateSection(targetId, data.section)) throw new Error('That section was removed before the AI finished.');
             const motion = wantsMotion ? await aiAnimate(editor, prompt.value, targetId, { extract: true }).catch(() => null) : null;
