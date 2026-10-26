@@ -232,7 +232,7 @@ final class BlockCatalog
                         'period' => self::text('e.g. "/month", "/session" or ""', true),
                         'features' => self::strings(3, 7, '3–6 short inclusions'),
                         'ctaText' => self::text('Button label, 2–3 words', true),
-                        'highlighted' => self::flag('true for exactly one recommended plan'),
+                        'highlighted' => self::flag('true for exactly one recommended plan — it gets a "Most Popular" badge and accent styling'),
                     ], 1, 4, '3 plans with the middle one highlighted is ideal'),
                     'columns' => self::int(1, 3, 3, 'Grid columns'),
                     'image' => self::image('Optional banner image'),
@@ -550,10 +550,14 @@ final class BlockCatalog
      | Prompt reference (generated, so it can never drift from the schema)
      * ------------------------------------------------------------------ */
 
-    public static function promptReference(): string
+    /** @param array<int, string>|null $only limit to these types (a one-section edit needs just its own) */
+    public static function promptReference(?array $only = null): string
     {
-        $lines = ['SECTION TYPES (props in brackets; * = required):'];
+        $lines = [$only ? 'SECTION REFERENCE (props in brackets; * = required):' : 'SECTION TYPES (props in brackets; * = required):'];
         foreach (self::blocks() as $type => $block) {
+            if ($only !== null && !in_array($type, $only, true)) {
+                continue;
+            }
             $props = [];
             foreach ($block['props'] as $key => $spec) {
                 if (in_array($key, ['sectionBg', 'sectionText', ...self::IMAGE_STYLE, ...self::ANIMATION_PROPS], true)) {

@@ -9,7 +9,7 @@ import { blockIcons, humanize, singular, ITEM_FIELDS, CARD_VISUAL_LISTS, ITEM_PA
 import { useToast } from './useToast';
 import { useLogoStudio } from './useLogoStudio';
 import axios from 'axios';
-import { streamAi } from './aiStream';
+import { streamAi, siteOutline } from './aiStream';
 import { ANIMATION_INTENT, aiAnimate } from './animPreview';
 const MotionPanel = defineAsyncComponent(() => import('./MotionPanel.vue'));
 
@@ -256,6 +256,7 @@ async function askAi(instruction) {
                 section: block.value,
                 theme: editor.schema.theme,
                 instruction: text,
+                site: siteOutline(editor.schema),
             });
             if (!editor.updateSection(targetId, data.section)) throw new Error('That section was removed before the AI finished.');
             summary = data.summary;

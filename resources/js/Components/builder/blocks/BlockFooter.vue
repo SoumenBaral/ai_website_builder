@@ -1,6 +1,7 @@
 <script setup>
 const props = defineProps({
     text: String,
+    sectionText: String,
     editable: { type: Boolean, default: false },
     id: String,
 });
@@ -12,7 +13,8 @@ function onEdit(e, key) {
 </script>
 
 <template>
-    <footer class="py-8 px-6 text-center" :style="{ background: 'var(--secondary, #0f172a)', color: '#94a3b8' }">
+    <!-- Published twin: resources/views/export/blocks/footer.blade.php — keep the two in step. -->
+    <footer class="py-8 px-6 text-center" :style="{ background: 'var(--secondary, #0f172a)', color: sectionText || '#94a3b8' }">
         <p
             class="text-sm"
             :style="{ fontFamily: 'var(--font-body)' }"

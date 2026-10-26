@@ -36,12 +36,13 @@ const heightClass = computed(() => ({
 </script>
 
 <template>
+    <!-- Published twin: resources/views/export/blocks/hero.blade.php — keep the two in step. -->
     <!-- Split layout: image on one side, text on other -->
     <section v-if="isSplit" class="flex items-stretch" :class="heightClass">
         <!-- Image side -->
         <div
             :class="layout === 'split-left' ? 'order-1' : 'order-2'"
-            class="hidden md:block w-1/2 bg-cover"
+            class="hidden md:block w-1/2 md:aspect-[5/4] bg-cover"
             :style="image ? { backgroundImage: `url(${image})`, backgroundPosition: '50% 18%' } : { background: 'var(--secondary, #e2e8f0)' }"
         ></div>
         <!-- Text side -->

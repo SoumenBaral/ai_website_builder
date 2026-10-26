@@ -314,4 +314,37 @@ describe('website generation on Puku', function () {
             ->assertJsonPath('section.props.heading', 'New headline');
         Http::assertSent(fn (Request $r) => $r->data()['model'] === 'puku-ai-2.8');
     });
+
+    it('gives a section edit the site outline and only that section type\'s reference', function () {
+        Http::fake([PUKU_URL => Http::response(pukuMessage([
+            'summary' => 'Shortened the heading.',
+            'props' => ['heading' => 'Why us', 'items' => [], 'columns' => 3, 'align' => 'center', 'image' => null, 'imageRadius' => null, 'imageShadow' => null, 'imageBorder' => null, 'sectionBg' => null, 'sectionText' => null],
+        ]))]);
+
+        $this->actingAs($this->user)->postJson(route('ai.editSection'), [
+            'section' => ['id' => 'blk_features_42', 'type' => 'features', 'props' => ['heading' => 'Why couples choose us', 'items' => []]],
+            'theme' => $this->page->schema['theme'],
+            'instruction' => 'Shorter heading',
+            'site' => [
+                'meta' => ['title' => 'Lumen Studio — Wedding Photography', 'language' => 'en'],
+                'sections' => [
+                    ['id' => 'blk_navbar_1', 'type' => 'navbar', 'heading' => 'Lumen Studio'],
+                    ['id' => 'blk_hero_1', 'type' => 'hero', 'heading' => 'Moments, beautifully kept'],
+                    ['id' => 'blk_features_42', 'type' => 'features', 'heading' => 'Why couples choose us'],
+                    ['id' => 'blk_contact_1', 'type' => 'contact', 'heading' => "Let's plan your day"],
+                ],
+            ],
+        ])->assertOk()->assertJsonPath('summary', 'Shortened the heading.');
+
+        Http::assertSent(function (Request $r) {
+            $prompt = $r->data()['messages'][0]['content'];
+
+            return str_contains($prompt, 'Brand: Lumen Studio')
+                && str_contains($prompt, '- hero (#home): "Moments, beautifully kept"')
+                && str_contains($prompt, '- contact (#contact)')
+                && str_contains($prompt, 'features (#features): "Why couples choose us"  ← the section you are editing')
+                && str_contains($prompt, '- features: ')     // its own reference line…
+                && !str_contains($prompt, '- pricing: ');    // …but not every other block type's
+        });
+    });
 });

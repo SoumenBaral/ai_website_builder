@@ -128,19 +128,25 @@ class AiWebsiteService
      *
      * @return array{section: array, summary: string}
      */
-    public function editSection(array $section, string $instruction, array $theme, ?int $userId = null): array
+    public function editSection(array $section, string $instruction, array $theme, ?int $userId = null, ?array $site = null): array
     {
         $type = (string) ($section['type'] ?? '');
         if (!BlockCatalog::has($type)) {
             throw new AiException('This section type cannot be edited with AI yet.', 422);
         }
 
+        $outline = $site ? $this->siteOutline($site, $section['id'] ?? null) : '';
+        $props = $this->forModel(['sections' => [$section]])['sections'][0]['props'] ?? [];
+
         $result = $this->requestJson(
             model: $this->provider->model('edit'),
             messages: [
                 ['role' => 'system', 'content' => Prompts::editSection($type)],
-                ['role' => 'user', 'content' => "Instruction: {$instruction}\n\nTheme: " . json_encode($theme, JSON_UNESCAPED_SLASHES)
-                    . "\n\nCurrent props:\n" . json_encode($section['props'] ?? new \stdClass(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)],
+                ['role' => 'user', 'content' => "Instruction: {$instruction}\n\n"
+                    . ($outline !== '' ? "Site outline:\n{$outline}\n\n" : '')
+                    . 'Theme: ' . json_encode($theme, JSON_UNESCAPED_SLASHES)
+                    . "\n\nCurrent props of the {$type} section:\n" . json_encode($props ?: new \stdClass(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                    . "\n\nBefore answering, check each part of the instruction against the props above: anything this section has no prop for, or that is already the case, must be named plainly in `summary`."],
             ],
             schemaName: 'section_edit',
             schema: BlockCatalog::sectionEditSchema($type),
@@ -468,6 +474,42 @@ class AiWebsiteService
         return $section;
     }
 
+    /**
+     * A few lines describing the site around one section: who it is for and which
+     * anchors exist, so a section edit writes copy that fits and links that resolve.
+     * $site is {meta, sections: [{id, type, heading?}]} — full sections work too.
+     */
+    private function siteOutline(array $site, ?string $currentId): string
+    {
+        $meta = (array) ($site['meta'] ?? []);
+        $sections = array_values(array_filter((array) ($site['sections'] ?? []), 'is_array'));
+        $brand = collect($sections)->firstWhere('type', 'navbar')['props']['brand']
+            ?? collect($sections)->firstWhere('type', 'navbar')['heading']
+            ?? null;
+
+        $lines = [];
+        foreach (['Brand' => $brand, 'Site title' => $meta['title'] ?? null, 'About' => $meta['description'] ?? null, 'Language' => $meta['language'] ?? null] as $label => $value) {
+            if (is_string($value) && trim($value) !== '') {
+                $lines[] = "{$label}: " . mb_substr(trim($value), 0, 200);
+            }
+        }
+
+        $anchors = BlockCatalog::anchors($sections);
+        $list = [];
+        foreach ($sections as $i => $s) {
+            $heading = $s['heading'] ?? $s['props']['heading'] ?? null;
+            $list[] = '- ' . ($s['type'] ?? '?')
+                . ($anchors[$i] ? " (#{$anchors[$i]})" : '')
+                . (is_string($heading) && $heading !== '' ? ': "' . mb_substr($heading, 0, 80) . '"' : '')
+                . (($s['id'] ?? null) === $currentId && $currentId !== null ? '  ← the section you are editing' : '');
+        }
+        if ($list) {
+            $lines[] = "Sections, top to bottom:\n" . implode("\n", array_slice($list, 0, 30));
+        }
+
+        return implode("\n", $lines);
+    }
+
     /** Strip noise the model doesn't need (keeps token use and latency down). */
     private function forModel(array $schema): array
     {
@@ -485,7 +527,16 @@ class AiWebsiteService
     {
         $text = is_string($value) ? trim($value) : '';
 
-        return $text !== '' ? mb_substr($text, 0, 200) : 'Done — your changes are applied.';
+        if ($text === '') {
+            return 'Done — your changes are applied.';
+        }
+        if (mb_strlen($text) <= 320) {
+            return $text;
+        }
+        // Cut on a word boundary so the toast never ends mid-word.
+        $cut = mb_substr($text, 0, 320);
+
+        return rtrim(mb_substr($cut, 0, (int) mb_strrpos($cut, ' ')), ' ,;:—') . '…';
     }
 
     /**

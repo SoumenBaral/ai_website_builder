@@ -98,7 +98,7 @@ it('serves published pages without a session, with public cache headers and an E
     [, $project] = published_site();
 
     $res = $this->get(route('site.show', $project->slug))->assertOk();
-    $res->assertHeader('Cache-Control', 'max-age=300, public, s-maxage=86400, stale-while-revalidate=86400');
+    $res->assertHeader('Cache-Control', 'no-cache, public');
     expect($res->headers->get('ETag'))->toStartWith('"')
         ->and($res->headers->get('Last-Modified'))->not->toBeEmpty()
         ->and($res->headers->getCookies())->toBe([]);          // no session / XSRF cookies
@@ -157,7 +157,7 @@ it('ships responsive, prioritised images and SEO tags', function () {
         ->toContain('photo-hero?w=480&amp;q=80&amp;auto=format&amp;fit=crop 480w')
         // about: Pexels URL gets a srcset too, and a stable box
         ->toContain('pexels-photo-12.jpeg?auto=compress&amp;w=480 480w')
-        ->toContain('aspect-ratio: 4 / 3')
+        ->toContain('class="w-full h-80 object-cover"') // fixed height = no layout shift, same crop as the editor
         // fonts: one family, non-blocking
         ->toContain('rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"')
         ->and(substr_count($html, 'family=Inter'))->toBe(2) // preload + noscript, not once per role
@@ -228,4 +228,28 @@ it('keeps automatic restore points while editing, without recording every keystr
     $save('Five');
     expect(\App\Models\PageVersion::where('page_id', $page->id)->where('label', 'autosave')->count())->toBe(\App\Http\Controllers\PageController::SNAPSHOT_KEEP)
         ->and(\App\Models\PageVersion::where('label', 'AI generation')->exists())->toBeTrue();
+});
+
+it('renders sections the way the editor shows them', function () {
+    [, $project] = published_site([
+        ['id' => 'p', 'type' => 'pricing', 'props' => ['heading' => 'Plans', 'plans' => [
+            ['name' => 'Mini', 'price' => '$180', 'period' => '/session', 'features' => ['1 hour'], 'ctaText' => 'Choose Mini', 'highlighted' => false],
+            ['name' => 'Wedding', 'price' => '$1,400', 'period' => '/day', 'features' => ['8 hours'], 'ctaText' => 'Check availability', 'highlighted' => true],
+        ]]],
+        ['id' => 'f', 'type' => 'faq', 'props' => ['heading' => 'FAQ', 'items' => [['question' => 'Where?', 'answer' => 'Portland.']]]],
+        ['id' => 'c', 'type' => 'contact', 'props' => ['heading' => 'Say hi', 'email' => 'hi@example.com', 'fields' => ['name', 'Email', 'message']]],
+        ['id' => 'a', 'type' => 'about', 'props' => ['heading' => 'Us', 'body' => 'Hello.', 'image' => 'https://images.unsplash.com/photo-about?w=1600', 'imageRadius' => 'xl', 'imageShadow' => 'lg']],
+    ]);
+
+    $html = $this->get(route('site.show', $project->slug))->getContent();
+
+    expect($html)
+        ->toContain('Most Popular')                       // the highlighted plan's badge
+        ->toContain('/session')->not->toContain('//session')
+        ->not->toContain('//day')
+        ->toContain('<details class="faq-item')           // collapsible, like the editor
+        ->toContain('Your Name')                          // friendly field labels…
+        ->toContain('placeholder="Email Address"')        // …and placeholders
+        ->not->toContain('<span class="font-semibold">Email:</span>')
+        ->toContain('border-radius: 0.75rem; box-shadow: 0 10px 15px'); // imageRadius / imageShadow honoured
 });

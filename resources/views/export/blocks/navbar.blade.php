@@ -12,7 +12,7 @@
                 <style>@media (min-width: 768px) { .site-logo { height: var(--logo-h) !important; } }</style>
             @endif
             @if(empty($props['logo']) || (!empty($props['brand']) && empty($props['hideBrandText'])))
-                <span class="text-xl font-bold" style="font-family: var(--font-heading);">{{ $props['brand'] ?? 'Brand' }}</span>
+                <span class="text-xl font-bold" style="font-family: var(--font-heading);">{{ $props['brand'] ?? '' }}</span>
             @endif
         </a>
 
@@ -76,5 +76,14 @@
         </div>
     </div>
 </nav>
-<!-- Spacer for fixed navbar -->
-<div style="height: 64px;"></div>
+<!-- Spacer for the fixed navbar: as tall as the bar really is (a large logo makes it taller than 64px). -->
+<div id="main-nav-spacer" style="height: 64px;"></div>
+<script>
+(function () {
+    var bar = document.querySelector('#main-nav > div'), spacer = document.getElementById('main-nav-spacer');
+    if (!bar || !spacer) return;
+    var fit = function () { spacer.style.height = bar.offsetHeight + 'px'; };
+    fit();
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(bar); else window.addEventListener('resize', fit);
+})();
+</script>

@@ -42,6 +42,7 @@ function onEditFeature(e, planIndex, featureIndex) {
 </script>
 
 <template>
+    <!-- Published twin: resources/views/export/blocks/pricing.blade.php — keep the two in step. -->
     <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
         <div class="max-w-6xl mx-auto">
             <img loading="lazy" decoding="async" v-if="image" :src="image" alt="" class="w-full h-48 object-cover mb-10" :class="imageClasses" />
@@ -109,7 +110,7 @@ function onEditFeature(e, planIndex, featureIndex) {
                         :style="{
                             background: plan.highlighted ? 'var(--primary)' : 'transparent',
                             color: plan.highlighted ? 'var(--on-primary)' : 'var(--primary)',
-                            border: plan.highlighted ? 'none' : '2px solid var(--primary)',
+                            border: '2px solid var(--primary)',
                             borderRadius: 'var(--radius)',
                             fontFamily: 'var(--font-heading)',
                         }"
