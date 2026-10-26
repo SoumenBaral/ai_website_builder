@@ -6,7 +6,7 @@
     @endif
     <div class="relative z-10 max-w-6xl mx-auto">
         @if(!empty($props['heading']))
-            <h2 class="text-3xl font-bold text-center mb-12" style="font-family: var(--font-heading);">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-12" style="font-family: var(--font-heading);">
                 {{ $props['heading'] }}
             </h2>
         @endif

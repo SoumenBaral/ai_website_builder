@@ -23,6 +23,7 @@ function onEdit(e, key) {
     emit('update:props', { [key]: e.target.innerText });
 }
 
+// Same rules as the published form (resources/views/export/blocks/contact.blade.php).
 const fieldLabels = {
     name: 'Your Name',
     email: 'Email Address',
@@ -30,9 +31,20 @@ const fieldLabels = {
     message: 'Your Message',
     subject: 'Subject',
 };
+const labelFor = (field) => fieldLabels[String(field).trim().toLowerCase()]
+    || String(field).replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+function fieldType(field) {
+    const f = String(field).trim().toLowerCase();
+    if (f.includes('mail')) return 'email';
+    if (f.includes('phone') || f.includes('mobile') || f.includes('whatsapp')) return 'tel';
+    if (f.includes('date')) return 'date';
+    if (['message', 'note', 'detail', 'comment', 'question', 'request'].some((w) => f.includes(w))) return 'textarea';
+    return 'text';
+}
 </script>
 
 <template>
+    <!-- Published twin: resources/views/export/blocks/contact.blade.php — keep the two in step. -->
     <section class="py-16 px-6" :style="{ background: 'var(--bg)', color: 'var(--text)' }">
         <div class="max-w-4xl mx-auto">
             <h2
@@ -74,22 +86,22 @@ const fieldLabels = {
 
                 <form @submit.prevent class="space-y-4">
                     <div v-for="field in fields" :key="field">
-                        <label class="block text-sm font-medium mb-1 capitalize" :style="{ fontFamily: 'var(--font-body)' }">
-                            {{ fieldLabels[field] || field }}
+                        <label class="block text-sm font-medium mb-1" :style="{ fontFamily: 'var(--font-body)' }">
+                            {{ labelFor(field) }}
                         </label>
                         <textarea
-                            v-if="field === 'message'"
+                            v-if="fieldType(field) === 'textarea'"
                             rows="4"
                             class="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2"
-                            :style="{ borderRadius: 'var(--radius)', focusRingColor: 'var(--primary)' }"
-                            :placeholder="fieldLabels[field] || field"
+                            :style="{ borderRadius: 'var(--radius)', background: '#fff', color: '#111827', '--tw-ring-color': 'var(--primary)' }"
+                            :placeholder="labelFor(field)"
                         ></textarea>
                         <input
                             v-else
-                            type="text"
+                            :type="fieldType(field)"
                             class="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2"
-                            :style="{ borderRadius: 'var(--radius)' }"
-                            :placeholder="fieldLabels[field] || field"
+                            :style="{ borderRadius: 'var(--radius)', background: '#fff', color: '#111827', '--tw-ring-color': 'var(--primary)' }"
+                            :placeholder="labelFor(field)"
                         />
                     </div>
                     <button

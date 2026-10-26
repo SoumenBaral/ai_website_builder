@@ -9,7 +9,7 @@
                 </h2>
             @endif
             @if(!empty($props['body']))
-                <div class="text-lg leading-relaxed opacity-80 space-y-4">{!! \App\Support\SiteHtml::paragraphs($props['body']) !!}</div>
+                <div class="text-lg leading-relaxed opacity-80 space-y-[1.625em]">{!! \App\Support\SiteHtml::paragraphs($props['body']) !!}</div>
             @endif
         </div>
         <div class="{{ $imgPos === 'left' ? 'md:order-1' : '' }}">

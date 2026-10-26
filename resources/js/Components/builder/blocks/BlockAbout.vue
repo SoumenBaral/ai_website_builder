@@ -32,7 +32,7 @@ function onEdit(e, key) {
                     @blur="onEdit($event, 'heading')"
                 >{{ heading }}</h2>
                 <p
-                    class="text-lg leading-relaxed opacity-80"
+                    class="text-lg leading-relaxed opacity-80 whitespace-pre-line"
                     :style="{ fontFamily: 'var(--font-body)' }"
                     :contenteditable="editable"
                     @blur="onEdit($event, 'body')"
