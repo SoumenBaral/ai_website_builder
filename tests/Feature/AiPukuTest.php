@@ -103,8 +103,11 @@ it('sends an Anthropic Messages request with the pk_live key and structured outp
             && $body['model'] === 'opus'
             && $body['max_tokens'] === 100
             && $body['temperature'] === 0.2
-            && $body['system'] === 'Be terse.'                       // system prompt lifted out of messages
-            && $body['messages'] === [['role' => 'user', 'content' => 'ping']]
+            && !isset($body['system'])                               // the gateway drops `system`…
+            && count($body['messages']) === 1
+            && str_starts_with($body['messages'][0]['content'], 'Be terse.') // …so it rides in the user turn
+            && str_contains($body['messages'][0]['content'], 'JSON schema')
+            && str_ends_with($body['messages'][0]['content'], 'ping')
             && $body['output_config']['format']['type'] === 'json_schema'
             && $body['output_config']['format']['schema']['additionalProperties'] === false
             && !isset($body['stream']);
@@ -134,16 +137,26 @@ it('reports truncation as "length" so the service can retry', function () {
     expect(pukuProvider()->complete(healthRequest())->truncated())->toBeTrue();
 });
 
+it('cuts the JSON object out of a reply wrapped in prose or code fences', function (string $text) {
+    Http::fake([PUKU_URL => Http::response(pukuMessage($text))]);
+
+    expect(json_decode(pukuProvider()->complete(healthRequest())->content, true))->toBe(['ok' => true]);
+})->with([
+    'code fence' => ["Here you go:\n```json\n{\"ok\": true}\n```"],
+    'prose around it' => ["Sure! {\"ok\": true} Let me know if you need more."],
+    'doubled opening brace' => ['{{"ok": true}'],
+]);
+
 it('falls back to the beta output_format, then to prompt-only JSON, when the gateway rejects structured outputs', function () {
     Http::fake([PUKU_URL => Http::sequence()
         ->push(['error' => ['type' => 'invalid_request_error', 'message' => 'output_config: Extra inputs are not permitted']], 400)
         ->push(['error' => ['type' => 'invalid_request_error', 'message' => 'output_format: Extra inputs are not permitted']], 400)
-        ->push(pukuMessage('"ok":true}')),
+        ->push(pukuMessage('{"ok":true}')),
     ]);
 
     $result = pukuProvider()->complete(healthRequest());
 
-    expect($result->content)->toBe('{"ok":true}'); // the "{" prefill is re-attached
+    expect($result->content)->toBe('{"ok":true}');
 
     $sent = collect(Http::recorded())->map(fn ($pair) => $pair[0]);
     expect($sent)->toHaveCount(3)
@@ -152,8 +165,8 @@ it('falls back to the beta output_format, then to prompt-only JSON, when the gat
         ->and($sent[1]->hasHeader('anthropic-beta', 'structured-outputs-2025-11-13'))->toBeTrue()
         ->and($sent[2]->data())->not->toHaveKey('output_config')
         ->and($sent[2]->data())->not->toHaveKey('output_format')
-        ->and($sent[2]->data()['messages'][1])->toBe(['role' => 'assistant', 'content' => '{'])
-        ->and($sent[2]->data()['system'])->toContain('JSON schema');
+        ->and($sent[2]->data()['messages'])->toHaveCount(1) // no "{" prefill
+        ->and($sent[2]->data()['messages'][0]['content'])->toContain('JSON schema');
 });
 
 it('classifies Puku errors so the caller knows whether to retry', function (int $status, array $error, string $kind) {
@@ -239,7 +252,7 @@ describe('website generation on Puku', function () {
         expect(AiGeneration::first())->model->toBe('opus')->output_tokens->toBe(2500);
 
         Http::assertSent(fn (Request $r) => $r->data()['model'] === 'opus'
-            && str_contains($r->data()['system'], 'conversion copywriter')
+            && str_contains($r->data()['messages'][0]['content'], 'conversion copywriter')
             && $r->data()['output_config']['format']['schema']['properties']['sections']['type'] === 'array');
     });
 
